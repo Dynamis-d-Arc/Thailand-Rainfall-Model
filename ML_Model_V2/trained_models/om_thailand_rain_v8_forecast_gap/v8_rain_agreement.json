@@ -1,0 +1,13 @@
+{
+  "rows": 599760,
+  "era5_wet_rate": 0.3810224089635854,
+  "fcst_wet_rate": 0.3810224089635854,
+  "precip_r_era5_vs_fcst": 1.0,
+  "wet_hour_jaccard": 1.0,
+  "imerg_rows": 598927,
+  "imerg_wet_rate": 0.3729436141633288,
+  "precip_r_era5_vs_imerg": 0.25533228492273713,
+  "precip_r_fcst_vs_imerg": 0.25533228492273713,
+  "wet_jaccard_era5_imerg": 0.3963478567474027,
+  "wet_jaccard_fcst_imerg": 0.3963478567474027
+}

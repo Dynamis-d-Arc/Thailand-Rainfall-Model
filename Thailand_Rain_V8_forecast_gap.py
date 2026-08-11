@@ -1,26 +1,41 @@
 # %% [markdown]
-# # Thailand_Rain_V8 — the reanalysis→forecast gap, measured
+# # Thailand_Rain_V8 — the reanalysis→forecast gap, measured (and dissolved)
 #
-# Every model in this project was trained and scored on Open-Meteo *archive* features, which
-# are ERA5(-Land) reanalysis at ~5-day latency — unusable at deployment time. A deployed
-# system would call the forecast API instead. This experiment measures what that swap costs,
-# on one month (June 2026) where three things exist at once:
+# This experiment set out to measure the cost of swapping ERA5 reanalysis features for
+# forecast-API features. Running `compare` against the historical-forecast API produced
+# r = 1.000 on every feature — the tables are the same data. Chasing that down exposed the
+# real situation (verified 2026-08-11 by direct API probes on 2024 and 2026 dates):
 #
-#   - ERA5 features        ("OM_THAILAND_DATA_PRECOMPUTE", the training diet)
-#   - forecast features    ("OM_THAILAND_FORECAST_PRECOMPUTE", archived ecmwf_ifs runs from
-#                           the historical-forecast API — verified bit-identical to what the
-#                           live API served in May 2026, r=1.000 on 6,384 sampled hours)
+#   **The archive API's `best_match` for this region resolves to `ecmwf_ifs`, not ERA5.**
+#   "OM_Thailand_Data" — the training diet of every Thailand model — was never reanalysis.
+#   It is Open-Meteo's archived ECMWF IFS (analysis + shortest-lead forecast) dataset, the
+#   same data family the live forecast API serves in real time. Explicit `models=era5`
+#   returns visibly different numbers. The ~5-day-latency deployability blocker therefore
+#   does not exist in the assumed form.
+#
+# What remains is a *lead-time* gap: at issue time t the newest published IFS run is
+# ~7-13 h old, so the live API serves hours t-6..t at longer lead than the shortest-lead
+# values the archive keeps (and training saw). The May 2026 pilot (scraped 15 h+ after the
+# fact) matches the archive at r = 1.000, so values have stabilised by +15 h; the open
+# question is the 0-13 h window. The previous-runs API measures a +24 h-staler version of
+# every input (`*_previous_day1`), which strictly upper-bounds that deployment gap.
+#
+#   - day-0 features       ("OM_THAILAND_DATA_PRECOMPUTE" — shortest-lead IFS, the training diet)
+#   - alt features         (`fcst`:    "OM_THAILAND_FORECAST_PRECOMPUTE", historical-forecast API
+#                                      — turned out identical to day-0; kept as the null control
+#                           `prevrun`: "OM_THAILAND_PREVRUN_PRECOMPUTE", previous-runs API at
+#                                      +24 h lead — the deployment-gap upper bound)
 #   - IMERG labels         (all 833 grids, provisional Late Run — same grader for both)
 #
 # The IR features (hw_block_offset0) are satellite observations and identical in both
 # configs; only the 66 OM columns change. Models are trained exactly as in the V3/V7 CV
 # (same params, purge, calibration) on all panel rows outside June 2026, then each fitted
 # model predicts BOTH test matrices, so the gap is measured model-for-model on identical
-# rows and the only moving part is ERA5-vs-forecast input.
+# rows and the only moving part is the input's lead time.
 #
 # Phases:
-#     python Thailand_Rain_V8_forecast_gap.py compare   # feature distributions + rain agreement
-#     python Thailand_Rain_V8_forecast_gap.py score     # the gate: ROC/PR-AUC gap per target
+#     python Thailand_Rain_V8_forecast_gap.py compare [fcst|prevrun]
+#     python Thailand_Rain_V8_forecast_gap.py score   [fcst|prevrun]
 #
 # (`compare` needs only the two precompute tables; `score` also needs the V3/V7 caches.)
 
@@ -41,8 +56,13 @@ from BKK_Rain_V3 import (
 from Thailand_Rain_V3 import CACHE, DB_CONFIG, IMERG_TABLE_NAME
 from Thailand_Rain_V7_himawari_ir import himawari_feature_names
 
-ERA5_TABLE = '"OM_THAILAND_DATA_PRECOMPUTE"'
-FCST_TABLE = '"OM_THAILAND_FORECAST_PRECOMPUTE"'
+DAY0_TABLE = '"OM_THAILAND_DATA_PRECOMPUTE"'
+ALT_TABLES = {
+    "fcst": '"OM_THAILAND_FORECAST_PRECOMPUTE"',
+    "prevrun": '"OM_THAILAND_PREVRUN_PRECOMPUTE"',
+}
+VARIANT = sys.argv[2] if len(sys.argv) > 2 else "prevrun"
+ALT_TABLE = ALT_TABLES[VARIANT]
 OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v8_forecast_gap"
 
 TEST_START = "2026-06-01 00:00:00"
@@ -69,13 +89,13 @@ def phase_compare():
                 if c not in ("grid_row", "grid_column", "latitude", "longitude",
                              "hour_sin", "hour_cos", "month_sin", "month_cos")]
     col_sql = ",\n        ".join(
-        f"e.{c} AS era5_{c}, f.{c} AS fcst_{c}" for c in num_cols)
+        f"e.{c} AS day0_{c}, f.{c} AS alt_{c}" for c in num_cols)
     query = f"""
     SELECT e.grid_number, e.local_forecast_time,
         {col_sql},
         im.precipitation_max_mm AS imerg_cell_max
-    FROM {ERA5_TABLE} e
-    JOIN {FCST_TABLE} f
+    FROM {DAY0_TABLE} e
+    JOIN {ALT_TABLE} f
       ON f.grid_number = e.grid_number
      AND f.local_forecast_time = e.local_forecast_time
     LEFT JOIN {IMERG_TABLE_NAME} im
@@ -94,45 +114,45 @@ def phase_compare():
 
     rows = []
     for c in num_cols:
-        a, b = df[f"era5_{c}"], df[f"fcst_{c}"]
+        a, b = df[f"day0_{c}"], df[f"alt_{c}"]
         m = a.notna() & b.notna()
         a, b = a[m], b[m]
         rows.append({"feature": c, "rows": int(m.sum()),
-                     "era5_mean": a.mean(), "fcst_mean": b.mean(),
-                     "bias_fcst_minus_era5": (b - a).mean(),
+                     "day0_mean": a.mean(), "alt_mean": b.mean(),
+                     "bias_alt_minus_day0": (b - a).mean(),
                      "mae": (b - a).abs().mean(),
                      "pearson_r": a.corr(b)})
     out = pd.DataFrame(rows)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    out.to_csv(OUTPUT_DIR / "v8_feature_agreement.csv", index=False)
-    log("=== ERA5 vs forecast, identical June rows (worst-agreeing 15 features) ===")
+    out.to_csv(OUTPUT_DIR / f"v8_feature_agreement_{VARIANT}.csv", index=False)
+    log(f"=== day-0 vs {VARIANT}, identical June rows (worst-agreeing 15 features) ===")
     print(out.sort_values("pearson_r").head(15).round(3).to_string(index=False))
 
     # Rain-hour agreement, three ways
-    m = df["era5_precipitation"].notna() & df["fcst_precipitation"].notna()
+    m = df["day0_precipitation"].notna() & df["alt_precipitation"].notna()
     d = df[m]
-    era5_wet = d["era5_precipitation"] >= RAIN_MM
-    fcst_wet = d["fcst_precipitation"] >= RAIN_MM
+    day0_wet = d["day0_precipitation"] >= RAIN_MM
+    alt_wet = d["alt_precipitation"] >= RAIN_MM
     agree = {
         "rows": int(len(d)),
-        "era5_wet_rate": float(era5_wet.mean()),
-        "fcst_wet_rate": float(fcst_wet.mean()),
-        "precip_r_era5_vs_fcst": float(d["era5_precipitation"].corr(d["fcst_precipitation"])),
-        "wet_hour_jaccard": float((era5_wet & fcst_wet).sum() / max((era5_wet | fcst_wet).sum(), 1)),
+        "day0_wet_rate": float(day0_wet.mean()),
+        "alt_wet_rate": float(alt_wet.mean()),
+        "precip_r_day0_vs_alt": float(d["day0_precipitation"].corr(d["alt_precipitation"])),
+        "wet_hour_jaccard": float((day0_wet & alt_wet).sum() / max((day0_wet | alt_wet).sum(), 1)),
     }
     di = d[d["imerg_cell_max"].notna()]
     imerg_wet = di["imerg_cell_max"] >= RAIN_MM
     agree.update({
         "imerg_rows": int(len(di)),
         "imerg_wet_rate": float(imerg_wet.mean()),
-        "precip_r_era5_vs_imerg": float(di["era5_precipitation"].corr(di["imerg_cell_max"])),
-        "precip_r_fcst_vs_imerg": float(di["fcst_precipitation"].corr(di["imerg_cell_max"])),
-        "wet_jaccard_era5_imerg": float(((di["era5_precipitation"] >= RAIN_MM) & imerg_wet).sum()
-                                        / max(((di["era5_precipitation"] >= RAIN_MM) | imerg_wet).sum(), 1)),
-        "wet_jaccard_fcst_imerg": float(((di["fcst_precipitation"] >= RAIN_MM) & imerg_wet).sum()
-                                        / max(((di["fcst_precipitation"] >= RAIN_MM) | imerg_wet).sum(), 1)),
+        "precip_r_day0_vs_imerg": float(di["day0_precipitation"].corr(di["imerg_cell_max"])),
+        "precip_r_alt_vs_imerg": float(di["alt_precipitation"].corr(di["imerg_cell_max"])),
+        "wet_jaccard_day0_imerg": float(((di["day0_precipitation"] >= RAIN_MM) & imerg_wet).sum()
+                                        / max(((di["day0_precipitation"] >= RAIN_MM) | imerg_wet).sum(), 1)),
+        "wet_jaccard_alt_imerg": float(((di["alt_precipitation"] >= RAIN_MM) & imerg_wet).sum()
+                                        / max(((di["alt_precipitation"] >= RAIN_MM) | imerg_wet).sum(), 1)),
     })
-    json.dump(agree, open(OUTPUT_DIR / "v8_rain_agreement.json", "w"), indent=2)
+    json.dump(agree, open(OUTPUT_DIR / f"v8_rain_agreement_{VARIANT}.json", "w"), indent=2)
     log("=== rain-hour agreement (June, all hourly rows) ===")
     for k, v in agree.items():
         print(f"  {k:28s} {v:.4f}" if isinstance(v, float) else f"  {k:28s} {v:,}")
@@ -151,13 +171,13 @@ def phase_compare():
 
 # %%
 def load_forecast_test_matrix(unit, tf, test_index):
-    """FEATURE_COLUMNS from the forecast precompute, aligned to the cached panel rows."""
+    """FEATURE_COLUMNS from the alt precompute, aligned to the cached panel rows."""
     feature_sql = ",\n        ".join(
         f"COALESCE({c}::real, 'NaN'::real) AS {c}" for c in FEATURE_COLUMNS)
     query = f"""
     SELECT grid_number, local_forecast_time,
         {feature_sql}
-    FROM {FCST_TABLE}
+    FROM {ALT_TABLE}
     WHERE local_forecast_time BETWEEN TIMESTAMP '{TEST_START}' AND TIMESTAMP '{TEST_END}'
     """
     conn = connect()
@@ -177,9 +197,9 @@ def load_forecast_test_matrix(unit, tf, test_index):
             missing += 1
         else:
             x[j] = v
-    log(f"forecast test matrix {x.shape}; panel rows missing from forecast table: {missing}")
+    log(f"{VARIANT} test matrix {x.shape}; panel rows missing from alt table: {missing}")
     if missing:
-        raise SystemExit("forecast precompute does not cover every June panel row — "
+        raise SystemExit("alt precompute does not cover every June panel row — "
                          "check the fetch warm-up window")
     return x
 
@@ -199,13 +219,13 @@ def phase_score():
     log(f"June test rows {test_mask.sum():,}   train rows {train_mask.sum():,} "
         f"(purge {PURGE_HOURS} h)")
 
-    fcst_x_test = load_forecast_test_matrix(unit, tf, test_index)
-    era5_x_test = base_x[test_mask]
+    alt_x_test = load_forecast_test_matrix(unit, tf, test_index)
+    day0_x_test = base_x[test_mask]
 
     # sanity: static columns must agree exactly between the two sources
     static_ix = [FEATURE_COLUMNS.index(c) for c in ("grid_row", "grid_column", "latitude", "longitude")]
-    if not np.allclose(era5_x_test[:, static_ix], fcst_x_test[:, static_ix], equal_nan=True):
-        raise SystemExit("static geometry columns disagree between ERA5 and forecast matrices")
+    if not np.allclose(day0_x_test[:, static_ix], alt_x_test[:, static_ix], equal_nan=True):
+        raise SystemExit("static geometry columns disagree between day-0 and alt matrices")
 
     configs = {
         "om_only": (base_x, None),
@@ -213,7 +233,7 @@ def phase_score():
     }
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    results_path = OUTPUT_DIR / "v8_gap_results.csv"
+    results_path = OUTPUT_DIR / f"v8_gap_results_{VARIANT}.csv"
     results = pd.read_csv(results_path).to_dict("records") if results_path.exists() else []
     done = {(r["config"], r["target"]) for r in results}
 
@@ -221,40 +241,40 @@ def phase_score():
     for ci, (config, (x_full, hw_block)) in enumerate(configs.items()):
         x_train_all = x_full[train_mask]
         if hw_block is None:
-            stacked_test = np.vstack([era5_x_test, fcst_x_test])
+            stacked_test = np.vstack([day0_x_test, alt_x_test])
         else:
             hw_test = hw_block[test_mask]
             stacked_test = np.vstack([
-                np.concatenate([era5_x_test, hw_test], axis=1),
-                np.concatenate([fcst_x_test, hw_test], axis=1),
+                np.concatenate([day0_x_test, hw_test], axis=1),
+                np.concatenate([alt_x_test, hw_test], axis=1),
             ])
         for i, (horizon, threshold) in enumerate(TARGETS):
             if (config, TARGET_NAMES[i]) in done:
                 log(f"  {config}/{TARGET_NAMES[i]}: already scored, skipping")
                 continue
             t0 = time.time()
-            rng = np.random.default_rng([RANDOM_STATE, 80, ci, i])
+            rng = np.random.default_rng([RANDOM_STATE, 80, ci, i])  # same seeds across variants
             raw, cal = fit_predict_calibrated(
                 x_train_all, y[train_mask, i], stacked_test, MODEL_PLAN[horizon], rng)
             y_test = y[test_mask, i]
             row = {"config": config, "target": TARGET_NAMES[i],
                    "test_rows": n_test, "base_rate": float(y_test.mean())}
-            for variant, sl in (("era5", slice(0, n_test)), ("fcst", slice(n_test, None))):
+            for variant, sl in (("day0", slice(0, n_test)), ("alt", slice(n_test, None))):
                 row[f"roc_{variant}"] = float(roc_auc_score(y_test, cal[sl]))
                 row[f"pr_{variant}"] = float(average_precision_score(y_test, cal[sl]))
-            row["roc_gap"] = row["roc_fcst"] - row["roc_era5"]
-            row["pr_gap"] = row["pr_fcst"] - row["pr_era5"]
+            row["roc_gap"] = row["roc_alt"] - row["roc_day0"]
+            row["pr_gap"] = row["pr_alt"] - row["pr_day0"]
             row["fit_minutes"] = (time.time() - t0) / 60
             results.append(row)
             pd.DataFrame(results).to_csv(results_path, index=False)
-            log(f"  {config}/{TARGET_NAMES[i]:10s} roc {row['roc_era5']:.4f} -> "
-                f"{row['roc_fcst']:.4f} (gap {row['roc_gap']:+.4f})   "
-                f"pr {row['pr_era5']:.4f} -> {row['pr_fcst']:.4f}   "
+            log(f"  {config}/{TARGET_NAMES[i]:10s} roc {row['roc_day0']:.4f} -> "
+                f"{row['roc_alt']:.4f} (gap {row['roc_gap']:+.4f})   "
+                f"pr {row['pr_day0']:.4f} -> {row['pr_alt']:.4f}   "
                 f"{row['fit_minutes']:.1f} min")
         del x_train_all, stacked_test
 
     out = pd.DataFrame(results)
-    log("=== reanalysis→forecast gap, June 2026, identical rows & models ===")
+    log(f"=== day-0 vs {VARIANT} gap, June 2026, identical rows & models ===")
     print(out.round(4).to_string(index=False))
     log(f"saved to {results_path}")
 
