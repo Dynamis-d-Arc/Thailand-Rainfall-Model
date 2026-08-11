@@ -1,0 +1,7 @@
+target,model,op_threshold,trained_rows,fit_minutes
+h1_0.1mm,lightgbm,0.35000000000000003,1930894,1.44
+h3_0.1mm,hist_gradient_boosting,0.4,1930894,1.02
+h6_0.1mm,hist_gradient_boosting,0.4,1930894,0.96
+h1_1.0mm,lightgbm,0.25,1930894,1.28
+h3_1.0mm,hist_gradient_boosting,0.3,1930894,0.93
+h6_1.0mm,hist_gradient_boosting,0.35000000000000003,1930894,0.93

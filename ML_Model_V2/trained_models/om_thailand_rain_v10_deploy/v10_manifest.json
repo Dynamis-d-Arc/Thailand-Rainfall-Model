@@ -1,0 +1,23 @@
+{
+  "built": "2026-08-11 22:01:04",
+  "config": "hw_offset0h (66 OM ecmwf_ifs features + 12 Himawari B13 IR features)",
+  "training": "full IR-covered panel (1,930,894 rows, blocks [0, 1, 5, 6, 7, 11, 12]), 12% isotonic calibration holdout",
+  "label": "IMERG cell-max precipitation over 25 km cell (39% provisional Late Run)",
+  "thresholds": "F1-optimal on calibrated V7 OOF (out-of-fold, IR-covered blocks)",
+  "generalization": "see om_thailand_rain_v7_himawari_ir/th_v7_per_block.csv; headline h1_1.0mm OOF ROC 0.8217 (June 2026 single-month check)",
+  "deployment_evidence": {
+    "input_source": "V8: OM features are archived ECMWF IFS (= live forecast API family), NOT ERA5; archive best_match == ecmwf_ifs here",
+    "staleness_bound": "V8: +24h-stale inputs cost <=0.015 ROC on this config; real staleness ~7-13h",
+    "regime_dependence": "V9: IR gain tracks deep-convection share; monitor p(cold235>0 | rain) monthly (fell 0.85 -> 0.72 in 2026)"
+  },
+  "versions": {
+    "sklearn": "1.9.0",
+    "lightgbm": "4.7.0",
+    "numpy": "2.5.0"
+  },
+  "serving_requirements": [
+    "OM features from live forecast API (models=ecmwf_ifs), 30 h of hourly history per cell for lags/rolling sums, neighbor aggregates over the 25 km grid",
+    "Himawari B13 slots t-1..t-4 via NOAA S3 (segments/masks in _th_cache/himawari/fetch_config.json)",
+    "hour_sin/cos, month_sin/cos from local (Asia/Bangkok) issue time"
+  ]
+}

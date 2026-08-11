@@ -437,19 +437,27 @@ def phase_parity():
 # probability + flag for each of the 6 targets.
 
 # %%
-def fetch_live_om(grid, batch_size=50, sleep_s=0.2):
+def fetch_live_om(grid, batch_size=50, sleep_s=1.0, retries=6):
     import requests
     frames = []
     points = grid.to_dict("records")
     for lo in range(0, len(points), batch_size):
         batch = points[lo:lo + batch_size]
-        resp = requests.get("https://api.open-meteo.com/v1/forecast", params={
-            "latitude": ",".join(str(p["latitude"]) for p in batch),
-            "longitude": ",".join(str(p["longitude"]) for p in batch),
-            "hourly": ",".join(RAW_VARS), "models": "ecmwf_ifs",
-            "past_days": 2, "forecast_days": 1, "timezone": "Asia/Bangkok",
-        }, timeout=120)
-        resp.raise_for_status()
+        for attempt in range(1, retries + 1):
+            resp = requests.get("https://api.open-meteo.com/v1/forecast", params={
+                "latitude": ",".join(str(p["latitude"]) for p in batch),
+                "longitude": ",".join(str(p["longitude"]) for p in batch),
+                "hourly": ",".join(RAW_VARS), "models": "ecmwf_ifs",
+                "past_days": 2, "forecast_days": 1, "timezone": "Asia/Bangkok",
+            }, timeout=120)
+            if resp.status_code == 429 and attempt < retries:
+                wait = min(60 * attempt, 300)
+                log(f"  batch {lo // batch_size + 1}: rate-limited, retrying in {wait}s "
+                    f"({attempt}/{retries})")
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            break
         payloads = resp.json()
         if isinstance(payloads, dict):
             payloads = [payloads]
