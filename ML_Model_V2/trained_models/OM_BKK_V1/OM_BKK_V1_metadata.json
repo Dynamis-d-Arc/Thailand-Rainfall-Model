@@ -1,0 +1,503 @@
+{
+  "version": "OM_BKK_V1",
+  "source_table": "\"OM_BKK_DATA\"",
+  "precompute_table": "\"OM_BKK_DATA_PRECOMPUTE\"",
+  "existing_binary_model_dir": "C:\\Users\\Brandon\\Documents\\Phase 1\\ML_Model_V2\\trained_models\\om_bkk_rain_any_final_4_neighbor_models",
+  "target_definition": "maximum hourly precipitation within t+1 through t+h",
+  "conditional_training_filter": "future_max_precipitation_h_mm > 0",
+  "horizons": [
+    1,
+    2,
+    3,
+    6
+  ],
+  "target_columns": [
+    "intensity_1h",
+    "intensity_2h",
+    "intensity_3h",
+    "intensity_6h"
+  ],
+  "future_max_columns": [
+    "future_max_precipitation_1h_mm",
+    "future_max_precipitation_2h_mm",
+    "future_max_precipitation_3h_mm",
+    "future_max_precipitation_6h_mm"
+  ],
+  "rainfall_thresholds_mm": {
+    "rain_positive_min_exclusive_mm": 0.0,
+    "moderate_min_mm": 2.5,
+    "heavy_min_mm": 7.5
+  },
+  "label_mapping": {
+    "label_to_id": {
+      "Light rain": 0,
+      "Moderate rain": 1,
+      "Heavy rain": 2
+    },
+    "id_to_label": {
+      "0": "Light rain",
+      "1": "Moderate rain",
+      "2": "Heavy rain"
+    },
+    "ordered_labels": [
+      "Light rain",
+      "Moderate rain",
+      "Heavy rain"
+    ]
+  },
+  "feature_columns": [
+    "temperature_2m",
+    "relative_humidity_2m",
+    "pressure_msl",
+    "surface_pressure",
+    "dew_point_2m",
+    "precipitation",
+    "cloud_cover",
+    "wind_speed_10m",
+    "wind_direction_10m",
+    "temperature_dew_point_spread",
+    "pressure_msl_change_3h",
+    "pressure_msl_change_6h",
+    "precipitation_lag_1h",
+    "precipitation_lag_2h",
+    "precipitation_lag_3h",
+    "precipitation_lag_6h",
+    "precipitation_sum_past_3h",
+    "precipitation_sum_past_6h",
+    "precipitation_sum_past_12h",
+    "precipitation_sum_past_24h",
+    "cloud_cover_lag_1h",
+    "cloud_cover_lag_3h",
+    "cloud_cover_lag_6h",
+    "humidity_lag_1h",
+    "humidity_lag_3h",
+    "humidity_lag_6h",
+    "wind_speed_lag_1h",
+    "wind_speed_lag_3h",
+    "hour_sin",
+    "hour_cos",
+    "month_sin",
+    "month_cos",
+    "grid_row",
+    "grid_column",
+    "latitude",
+    "longitude",
+    "neighbor_count",
+    "neighbor_precipitation_mean",
+    "neighbor_precipitation_max",
+    "neighbor_precipitation_sum",
+    "neighbor_rain_count",
+    "neighbor_rain_rate",
+    "neighbor_cloud_cover_mean",
+    "neighbor_cloud_cover_max",
+    "neighbor_relative_humidity_mean",
+    "neighbor_relative_humidity_max",
+    "neighbor_pressure_msl_mean",
+    "neighbor_pressure_msl_min",
+    "neighbor_pressure_msl_max",
+    "neighbor_temperature_2m_mean",
+    "neighbor_dew_point_2m_mean",
+    "neighbor_temperature_dew_point_spread_mean",
+    "neighbor_wind_speed_10m_mean",
+    "neighbor_wind_speed_10m_max",
+    "row_minus_precipitation_mean",
+    "row_plus_precipitation_mean",
+    "column_minus_precipitation_mean",
+    "column_plus_precipitation_mean",
+    "row_minus_cloud_cover_mean",
+    "row_plus_cloud_cover_mean",
+    "column_minus_cloud_cover_mean",
+    "column_plus_cloud_cover_mean",
+    "neighbor_precipitation_mean_minus_center",
+    "neighbor_cloud_cover_mean_minus_center",
+    "neighbor_relative_humidity_mean_minus_center",
+    "center_pressure_msl_minus_neighbor_mean"
+  ],
+  "train_boundary": "2025-01-18 02:00:00",
+  "validation_boundary": "2025-10-18 22:00:00",
+  "purge_hours_by_horizon": {
+    "1": 0,
+    "2": 1,
+    "3": 2,
+    "6": 5
+  },
+  "sample_rows": null,
+  "training_rows": [
+    {
+      "horizon_h": 1,
+      "train_rows": 382511,
+      "validation_rows": 98784,
+      "best_iteration": 400
+    },
+    {
+      "horizon_h": 2,
+      "train_rows": 487195,
+      "validation_rows": 128433,
+      "best_iteration": 400
+    },
+    {
+      "horizon_h": 3,
+      "train_rows": 567847,
+      "validation_rows": 151052,
+      "best_iteration": 400
+    },
+    {
+      "horizon_h": 6,
+      "train_rows": 744163,
+      "validation_rows": 197903,
+      "best_iteration": 400
+    }
+  ],
+  "validation_results": [
+    {
+      "horizon_h": 1,
+      "split": "validation",
+      "rows": 98784,
+      "macro_f1": 0.42015391073131586,
+      "macro_precision": 0.4074012047651838,
+      "macro_recall": 0.5280019655789859,
+      "heavy_rain_precision": 0.09376210771018985,
+      "heavy_rain_recall": 0.34399431414356785
+    },
+    {
+      "horizon_h": 2,
+      "split": "validation",
+      "rows": 128433,
+      "macro_f1": 0.4022041455919978,
+      "macro_precision": 0.3983098915567312,
+      "macro_recall": 0.48546744577818596,
+      "heavy_rain_precision": 0.08056543231289567,
+      "heavy_rain_recall": 0.335621387283237
+    },
+    {
+      "horizon_h": 3,
+      "split": "validation",
+      "rows": 151052,
+      "macro_f1": 0.3951260387301227,
+      "macro_precision": 0.3945917540071254,
+      "macro_recall": 0.46038129796347044,
+      "heavy_rain_precision": 0.0798639034952057,
+      "heavy_rain_recall": 0.3138065143412737
+    },
+    {
+      "horizon_h": 6,
+      "split": "validation",
+      "rows": 197903,
+      "macro_f1": 0.3894494083563902,
+      "macro_precision": 0.3958863449667851,
+      "macro_recall": 0.4360753430384942,
+      "heavy_rain_precision": 0.08125314122968672,
+      "heavy_rain_recall": 0.2988293284041898
+    }
+  ],
+  "test_results": [
+    {
+      "horizon_h": 1,
+      "split": "test",
+      "rows": 59823,
+      "macro_f1": 0.4054822822093101,
+      "macro_precision": 0.39204083557847835,
+      "macro_recall": 0.4966483683214003,
+      "heavy_rain_precision": 0.047406581148912434,
+      "heavy_rain_recall": 0.21963824289405684
+    },
+    {
+      "horizon_h": 2,
+      "split": "test",
+      "rows": 80434,
+      "macro_f1": 0.3961998776513232,
+      "macro_precision": 0.38851134403014836,
+      "macro_recall": 0.4639146634013212,
+      "heavy_rain_precision": 0.04033699259637478,
+      "heavy_rain_recall": 0.206266318537859
+    },
+    {
+      "horizon_h": 3,
+      "split": "test",
+      "rows": 96905,
+      "macro_f1": 0.4000156587126776,
+      "macro_precision": 0.3942160022154337,
+      "macro_recall": 0.45590107111080935,
+      "heavy_rain_precision": 0.03783333333333333,
+      "heavy_rain_recall": 0.19894829097283084
+    },
+    {
+      "horizon_h": 6,
+      "split": "test",
+      "rows": 134166,
+      "macro_f1": 0.39450169878004715,
+      "macro_precision": 0.39664469454586354,
+      "macro_recall": 0.4363223079901641,
+      "heavy_rain_precision": 0.03723234260147012,
+      "heavy_rain_recall": 0.20831470719713902
+    }
+  ],
+  "validation_class_results": [
+    {
+      "horizon_h": 1,
+      "split": "validation",
+      "class_id": 0,
+      "class_label": "Light rain",
+      "support": 89938,
+      "precision": 0.9563732109100729,
+      "recall": 0.7875314105272521,
+      "f1": 0.8637788265710558,
+      "pr_auc_ovr": 0.9725138263168909
+    },
+    {
+      "horizon_h": 1,
+      "split": "validation",
+      "class_id": 1,
+      "class_label": "Moderate rain",
+      "support": 7439,
+      "precision": 0.17206829567528883,
+      "recall": 0.45248017206613794,
+      "f1": 0.24932409910744047,
+      "pr_auc_ovr": 0.1716739450673493
+    },
+    {
+      "horizon_h": 1,
+      "split": "validation",
+      "class_id": 2,
+      "class_label": "Heavy rain",
+      "support": 1407,
+      "precision": 0.09376210771018985,
+      "recall": 0.34399431414356785,
+      "f1": 0.14735880651545136,
+      "pr_auc_ovr": 0.1248874831599362
+    },
+    {
+      "horizon_h": 2,
+      "split": "validation",
+      "class_id": 0,
+      "class_label": "Light rain",
+      "support": 112541,
+      "precision": 0.9276163367975111,
+      "recall": 0.7471143849796963,
+      "f1": 0.8276381390175359,
+      "pr_auc_ovr": 0.9486852902911573
+    },
+    {
+      "horizon_h": 2,
+      "split": "validation",
+      "class_id": 1,
+      "class_label": "Moderate rain",
+      "support": 13124,
+      "precision": 0.18674790555978674,
+      "recall": 0.3736665650716245,
+      "f1": 0.24903514117408085,
+      "pr_auc_ovr": 0.17867560121477127
+    },
+    {
+      "horizon_h": 2,
+      "split": "validation",
+      "class_id": 2,
+      "class_label": "Heavy rain",
+      "support": 2768,
+      "precision": 0.08056543231289567,
+      "recall": 0.335621387283237,
+      "f1": 0.12993915658437652,
+      "pr_auc_ovr": 0.10501134170042173
+    },
+    {
+      "horizon_h": 3,
+      "split": "validation",
+      "class_id": 0,
+      "class_label": "Light rain",
+      "support": 128451,
+      "precision": 0.9047131147540983,
+      "recall": 0.7286669624993188,
+      "f1": 0.8072028873643314,
+      "pr_auc_ovr": 0.9301469414955343
+    },
+    {
+      "horizon_h": 3,
+      "split": "validation",
+      "class_id": 1,
+      "class_label": "Moderate rain",
+      "support": 18487,
+      "precision": 0.19919824377207215,
+      "recall": 0.3386704170498188,
+      "f1": 0.2508513962899155,
+      "pr_auc_ovr": 0.19346273899311567
+    },
+    {
+      "horizon_h": 3,
+      "split": "validation",
+      "class_id": 2,
+      "class_label": "Heavy rain",
+      "support": 4114,
+      "precision": 0.0798639034952057,
+      "recall": 0.3138065143412737,
+      "f1": 0.12732383253612112,
+      "pr_auc_ovr": 0.09526529933431577
+    },
+    {
+      "horizon_h": 6,
+      "split": "validation",
+      "class_id": 0,
+      "class_label": "Light rain",
+      "support": 156568,
+      "precision": 0.8599970785386201,
+      "recall": 0.6768560625415155,
+      "f1": 0.7575144570648406,
+      "pr_auc_ovr": 0.8894264814038819
+    },
+    {
+      "horizon_h": 6,
+      "split": "validation",
+      "class_id": 1,
+      "class_label": "Moderate rain",
+      "support": 33220,
+      "precision": 0.24640881513204854,
+      "recall": 0.33254063816977725,
+      "f1": 0.2830676984574386,
+      "pr_auc_ovr": 0.240954913090213
+    },
+    {
+      "horizon_h": 6,
+      "split": "validation",
+      "class_id": 2,
+      "class_label": "Heavy rain",
+      "support": 8115,
+      "precision": 0.08125314122968672,
+      "recall": 0.2988293284041898,
+      "f1": 0.12776606954689146,
+      "pr_auc_ovr": 0.09141214171645909
+    }
+  ],
+  "test_class_results": [
+    {
+      "horizon_h": 1,
+      "split": "test",
+      "class_id": 0,
+      "class_label": "Light rain",
+      "support": 55920,
+      "precision": 0.9622156482709374,
+      "recall": 0.8434012875536481,
+      "f1": 0.898899318625816,
+      "pr_auc_ovr": 0.9791558309647391
+    },
+    {
+      "horizon_h": 1,
+      "split": "test",
+      "class_id": 1,
+      "class_label": "Moderate rain",
+      "support": 3516,
+      "precision": 0.16650027731558514,
+      "recall": 0.426905574516496,
+      "f1": 0.2395658766259676,
+      "pr_auc_ovr": 0.16508012640152966
+    },
+    {
+      "horizon_h": 1,
+      "split": "test",
+      "class_id": 2,
+      "class_label": "Heavy rain",
+      "support": 387,
+      "precision": 0.047406581148912434,
+      "recall": 0.21963824289405684,
+      "f1": 0.0779816513761468,
+      "pr_auc_ovr": 0.04341881266369142
+    },
+    {
+      "horizon_h": 2,
+      "split": "test",
+      "class_id": 0,
+      "class_label": "Light rain",
+      "support": 73333,
+      "precision": 0.9421319479218828,
+      "recall": 0.8209946408847313,
+      "f1": 0.8774018668434898,
+      "pr_auc_ovr": 0.9642163945712969
+    },
+    {
+      "horizon_h": 2,
+      "split": "test",
+      "class_id": 1,
+      "class_label": "Moderate rain",
+      "support": 6335,
+      "precision": 0.18306509157218742,
+      "recall": 0.36448303078137334,
+      "f1": 0.24371965378931815,
+      "pr_auc_ovr": 0.17640678769051374
+    },
+    {
+      "horizon_h": 2,
+      "split": "test",
+      "class_id": 2,
+      "class_label": "Heavy rain",
+      "support": 766,
+      "precision": 0.04033699259637478,
+      "recall": 0.206266318537859,
+      "f1": 0.06747811232116165,
+      "pr_auc_ovr": 0.03880982046509207
+    },
+    {
+      "horizon_h": 3,
+      "split": "test",
+      "class_id": 0,
+      "class_label": "Light rain",
+      "support": 86781,
+      "precision": 0.9295680365416672,
+      "recall": 0.8160887751927265,
+      "f1": 0.8691399538559718,
+      "pr_auc_ovr": 0.9557941654071838
+    },
+    {
+      "horizon_h": 3,
+      "split": "test",
+      "class_id": 1,
+      "class_label": "Moderate rain",
+      "support": 8983,
+      "precision": 0.21524663677130046,
+      "recall": 0.3526661471668708,
+      "f1": 0.2673304923842876,
+      "pr_auc_ovr": 0.19677413399226404
+    },
+    {
+      "horizon_h": 3,
+      "split": "test",
+      "class_id": 2,
+      "class_label": "Heavy rain",
+      "support": 1141,
+      "precision": 0.03783333333333333,
+      "recall": 0.19894829097283084,
+      "f1": 0.06357652989777342,
+      "pr_auc_ovr": 0.032639165171787735
+    },
+    {
+      "horizon_h": 6,
+      "split": "test",
+      "class_id": 0,
+      "class_label": "Light rain",
+      "support": 115793,
+      "precision": 0.9027143768713494,
+      "recall": 0.7941326332334424,
+      "f1": 0.8449494160563821,
+      "pr_auc_ovr": 0.9350123002658879
+    },
+    {
+      "horizon_h": 6,
+      "split": "test",
+      "class_id": 1,
+      "class_label": "Moderate rain",
+      "support": 16136,
+      "precision": 0.2499873641647713,
+      "recall": 0.30651958353991077,
+      "f1": 0.2753820884719245,
+      "pr_auc_ovr": 0.21880398150895108
+    },
+    {
+      "horizon_h": 6,
+      "split": "test",
+      "class_id": 2,
+      "class_label": "Heavy rain",
+      "support": 2237,
+      "precision": 0.03723234260147012,
+      "recall": 0.20831470719713902,
+      "f1": 0.06317359181183488,
+      "pr_auc_ovr": 0.035268327596733366
+    }
+  ]
+}

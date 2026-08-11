@@ -1,0 +1,7 @@
+horizon_h,target_column,meaning,rain_threshold_mm,rows,rain_rows,rain_rate
+1,rain_exact_next_1h,rain exactly at t+1,0.1,2453472,541118,0.22055193619491073
+2,rain_exact_next_2h,rain exactly at t+2,0.1,2453472,541062,0.22052911139805143
+3,rain_exact_next_3h,rain exactly at t+3,0.1,2453472,541013,0.22050913970079952
+4,rain_exact_next_4h,rain exactly at t+4,0.1,2453472,540980,0.22049568937407885
+5,rain_exact_next_5h,rain exactly at t+5,0.1,2453472,540965,0.22048957558920582
+6,rain_exact_next_6h,rain exactly at t+6,0.1,2453472,540946,0.2204818314617

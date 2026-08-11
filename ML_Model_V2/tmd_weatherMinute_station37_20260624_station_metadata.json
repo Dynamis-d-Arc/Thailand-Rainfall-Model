@@ -1,0 +1,17 @@
+﻿{
+    "regions":  "1",
+    "awsid":  "37",
+    "wmo":  "0",
+    "sname":  "Bangna Agrometeorlogical Station",
+    "fname":  "Bangna Agrometeorlogical Station",
+    "lat":  "13.6675",
+    "lon":  "100.60528",
+    "alt":  "5.0",
+    "wvSensor":  "y",
+    "mapLevel":  "2",
+    "rowNumber":  null,
+    "online":  null,
+    "oldid":  null,
+    "cnctYn":  "y",
+    "qcYn":  " "
+}

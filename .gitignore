@@ -1,0 +1,24 @@
+# Environments
+.venv/
+node_modules/
+
+# Python / Jupyter transients
+__pycache__/
+.ipynb_checkpoints/
+*.pyc
+
+# Regenerable CV fold caches (multi-GB)
+ML_Model_V2/_th_cache/
+ML_Model_V2/_v3_cache/
+ML_Model_V2/cache/
+
+# Trained model binaries and array dumps (rebuildable from scripts)
+*.joblib
+*.npy
+*.npz
+
+# Run logs
+*.log
+
+# Large derived analysis output (rebuildable from Data_Analysis notebooks)
+Data_Analysis/om_bkk_analysis_outputs/om_bkk_daily_by_grid.csv

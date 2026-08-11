@@ -1,0 +1,171 @@
+{
+  "purpose": "Himawari B13 IR history as the area-covering minutes-latency feed; measures whether cold-cloud-top features close the gap between the gauge gain (V5, ~30% of ceiling) and the IMERG offset-0 ceiling (V3/V4)",
+  "protocol": "identical to V3/V4/V5 (imported): leave-one-year-out CV, 24 h purge, isotonic calibration, IMERG labels, F1-optimal leave-one-year-out thresholds",
+  "source": "s3://noaa-himawari8 + s3://noaa-himawari9, AHI-L1b-FLDK B13 (10.4 um, 2 km), hourly :00 slots, one/two segments per slot",
+  "himawari_features": [
+    "hw_tb_mean_lag1",
+    "hw_tb_min_lag1",
+    "hw_tb_min_env_lag1",
+    "hw_cold220_env_lag1",
+    "hw_cold235_env_lag1",
+    "hw_cold235_scene_lag1",
+    "hw_tb_min_env_lag2",
+    "hw_tb_min_env_lag3",
+    "hw_tb_min_env_drop3",
+    "hw_tb_min_env_min3",
+    "hw_cold235_env_max3",
+    "hw_valid"
+  ],
+  "configs": {
+    "hw_offset0h": [
+      "hw_tb_mean_lag1",
+      "hw_tb_min_lag1",
+      "hw_tb_min_env_lag1",
+      "hw_cold220_env_lag1",
+      "hw_cold235_env_lag1",
+      "hw_cold235_scene_lag1",
+      "hw_tb_min_env_lag2",
+      "hw_tb_min_env_lag3",
+      "hw_tb_min_env_drop3",
+      "hw_tb_min_env_min3",
+      "hw_cold235_env_max3",
+      "hw_valid"
+    ],
+    "hw_tmd_offset0h": [
+      "hw_tb_mean_lag1",
+      "hw_tb_min_lag1",
+      "hw_tb_min_env_lag1",
+      "hw_cold220_env_lag1",
+      "hw_cold235_env_lag1",
+      "hw_cold235_scene_lag1",
+      "hw_tb_min_env_lag2",
+      "hw_tb_min_env_lag3",
+      "hw_tb_min_env_drop3",
+      "hw_tb_min_env_min3",
+      "hw_cold235_env_max3",
+      "hw_valid",
+      "tg_idw_lag1",
+      "tg_idw_lag2",
+      "tg_idw_lag3",
+      "tg_idw_lag6",
+      "tg_idw_sum3",
+      "tg_idw_sum6",
+      "tg_idw_sum12",
+      "tg_idw_sum24",
+      "tg_rain_lag1",
+      "tg_rain_count3",
+      "tg_rain_count6",
+      "tg_hours_since_rain6",
+      "tg_near_lag1",
+      "tg_max_lag1",
+      "tg_rainfrac_lag1",
+      "tg_nrep_lag1"
+    ]
+  },
+  "roc_gain_vs_references": [
+    {
+      "target": "h1_0.1mm",
+      "hw_offset0h": 0.023383090333334633,
+      "hw_tmd_offset0h": 0.025009618436452774,
+      "tmd_offset0h": 0.007122574577755447,
+      "imerg_offset0h": 0.03825186641498579,
+      "imerg_offset6h": 0.003348670232062201
+    },
+    {
+      "target": "h1_1.0mm",
+      "hw_offset0h": 0.03330924767956944,
+      "hw_tmd_offset0h": 0.03750462485463846,
+      "tmd_offset0h": 0.014455872781350076,
+      "imerg_offset0h": 0.04967156010767504,
+      "imerg_offset6h": 0.00218457940049932
+    },
+    {
+      "target": "h3_0.1mm",
+      "hw_offset0h": 0.016197897333466327,
+      "hw_tmd_offset0h": 0.016937695898852523,
+      "tmd_offset0h": 0.0029987355033506136,
+      "imerg_offset0h": 0.023231865757254,
+      "imerg_offset6h": 0.003992837913494474
+    },
+    {
+      "target": "h3_1.0mm",
+      "hw_offset0h": 0.022809640596191283,
+      "hw_tmd_offset0h": 0.025454191127343373,
+      "tmd_offset0h": 0.008200160108479349,
+      "imerg_offset0h": 0.02754413709557002,
+      "imerg_offset6h": 0.000859662358854707
+    },
+    {
+      "target": "h6_0.1mm",
+      "hw_offset0h": 0.012200711651658702,
+      "hw_tmd_offset0h": 0.011473941550568911,
+      "tmd_offset0h": 0.0010932915643350194,
+      "imerg_offset0h": 0.017212416211825676,
+      "imerg_offset6h": 0.005680688993300986
+    },
+    {
+      "target": "h6_1.0mm",
+      "hw_offset0h": 0.015941478148157606,
+      "hw_tmd_offset0h": 0.017283737378043562,
+      "tmd_offset0h": 0.002385942624055448,
+      "imerg_offset0h": 0.016769145515813433,
+      "imerg_offset6h": 0.0011560891684677665
+    }
+  ],
+  "f1_gain_vs_references": [
+    {
+      "target": "h1_0.1mm",
+      "hw_offset0h": 0.03473245391145274,
+      "hw_tmd_offset0h": 0.03621727359193316,
+      "tmd_offset0h": 0.011542019603335008,
+      "imerg_offset0h": 0.06392892284432539,
+      "imerg_offset6h": 0.003152625283418753
+    },
+    {
+      "target": "h1_1.0mm",
+      "hw_offset0h": 0.08044830325704821,
+      "hw_tmd_offset0h": 0.09343181253616123,
+      "tmd_offset0h": 0.03847131573454843,
+      "imerg_offset0h": 0.15269226283339432,
+      "imerg_offset6h": 0.0041759656112040355
+    },
+    {
+      "target": "h3_0.1mm",
+      "hw_offset0h": 0.015162901052195421,
+      "hw_tmd_offset0h": 0.016157694813633827,
+      "tmd_offset0h": 0.0016999127125961744,
+      "imerg_offset0h": 0.024764197828762602,
+      "imerg_offset6h": 0.004161925340684269
+    },
+    {
+      "target": "h3_1.0mm",
+      "hw_offset0h": 0.040256788087180195,
+      "hw_tmd_offset0h": 0.0477239899566273,
+      "tmd_offset0h": 0.019375250282481882,
+      "imerg_offset0h": 0.06973289535693072,
+      "imerg_offset6h": 0.003320156176267186
+    },
+    {
+      "target": "h6_0.1mm",
+      "hw_offset0h": 0.010694922825501219,
+      "hw_tmd_offset0h": 0.008846720805543162,
+      "tmd_offset0h": 0.0006884691355295569,
+      "imerg_offset0h": 0.014408018437047976,
+      "imerg_offset6h": 0.005026910013802288
+    },
+    {
+      "target": "h6_1.0mm",
+      "hw_offset0h": 0.02738540969880332,
+      "hw_tmd_offset0h": 0.03164622629647551,
+      "tmd_offset0h": 0.00913074395552993,
+      "imerg_offset0h": 0.030921973408901904,
+      "imerg_offset6h": 0.005395656705965313
+    }
+  ],
+  "caveats": [
+    "IR sees cloud tops, not rain: cold cirrus inflates cold fractions without precipitation, so the IR ceiling may sit well below the IMERG offset-0 ceiling.",
+    "Real-time NOAA bucket latency is ~10-20 min after scan; stamp t-1 at forecast time t is comfortably honest.",
+    "Slots that failed to download/decode carry NaN features (hw_valid=0).",
+    "IMERG labels: an IR-graded or gauge-graded evaluation answers a different question (three-way label disagreement)."
+  ]
+}

@@ -1,0 +1,237 @@
+{
+  "purpose": "TMD gauge history as the low-latency observed-rain feed the V4 sweep calls for; measures how much of the IMERG offset-0/1 gain gauges recover despite the point-vs-cell label mismatch",
+  "protocol": "identical to V3/V4 (imported): leave-one-year-out CV, 24 h purge, isotonic calibration, IMERG labels, F1-optimal leave-one-year-out thresholds",
+  "gauge_features": [
+    "tg_idw_lag1",
+    "tg_idw_lag2",
+    "tg_idw_lag3",
+    "tg_idw_lag6",
+    "tg_idw_sum3",
+    "tg_idw_sum6",
+    "tg_idw_sum12",
+    "tg_idw_sum24",
+    "tg_rain_lag1",
+    "tg_rain_count3",
+    "tg_rain_count6",
+    "tg_hours_since_rain6",
+    "tg_near_lag1",
+    "tg_max_lag1",
+    "tg_rainfrac_lag1",
+    "tg_nrep_lag1"
+  ],
+  "n_features": 82,
+  "gauge_source": "\"BKK_TMD_WEATHER_DATA\", 28 stations, negatives nulled, IDW within 150 km power 2.0",
+  "offsets": [
+    0,
+    1
+  ],
+  "roc_gain_vs_references": [
+    {
+      "target": "h1_0.1mm",
+      "tmd_offset0h": 0.007122574577755447,
+      "tmd_offset1h": 0.003036991435563574,
+      "imerg_offset0h": 0.03825186641498579,
+      "imerg_offset1h": 0.018710397420819147,
+      "imerg_offset6h": 0.003348670232062201
+    },
+    {
+      "target": "h1_1.0mm",
+      "tmd_offset0h": 0.014455872781350076,
+      "tmd_offset1h": 0.005488520962347976,
+      "imerg_offset0h": 0.04967156010767504,
+      "imerg_offset1h": 0.02069953936548552,
+      "imerg_offset6h": 0.00218457940049932
+    },
+    {
+      "target": "h3_0.1mm",
+      "tmd_offset0h": 0.0029987355033506136,
+      "tmd_offset1h": 0.0005738089243338962,
+      "imerg_offset0h": 0.023231865757254,
+      "imerg_offset1h": 0.013083678439922863,
+      "imerg_offset6h": 0.003992837913494474
+    },
+    {
+      "target": "h3_1.0mm",
+      "tmd_offset0h": 0.008200160108479349,
+      "tmd_offset1h": 0.0023672851634087833,
+      "imerg_offset0h": 0.02754413709557002,
+      "imerg_offset1h": 0.01107081252662967,
+      "imerg_offset6h": 0.000859662358854707
+    },
+    {
+      "target": "h6_0.1mm",
+      "tmd_offset0h": 0.0010932915643350194,
+      "tmd_offset1h": -0.00022864372415187795,
+      "imerg_offset0h": 0.017212416211825676,
+      "imerg_offset1h": 0.01153264285891309,
+      "imerg_offset6h": 0.005680688993300986
+    },
+    {
+      "target": "h6_1.0mm",
+      "tmd_offset0h": 0.002385942624055448,
+      "tmd_offset1h": 7.349547258117539e-05,
+      "imerg_offset0h": 0.016769145515813433,
+      "imerg_offset1h": 0.0067922364471185714,
+      "imerg_offset6h": 0.0011560891684677665
+    }
+  ],
+  "f1_gain_vs_references": [
+    {
+      "target": "h1_0.1mm",
+      "tmd_offset0h": 0.011542019603335008,
+      "tmd_offset1h": 0.005124595249150099,
+      "imerg_offset0h": 0.06392892284432539,
+      "imerg_offset1h": 0.025238523932500923,
+      "imerg_offset6h": 0.003152625283418753
+    },
+    {
+      "target": "h1_1.0mm",
+      "tmd_offset0h": 0.03847131573454843,
+      "tmd_offset1h": 0.014262889951088487,
+      "imerg_offset0h": 0.15269226283339432,
+      "imerg_offset1h": 0.04659922516753179,
+      "imerg_offset6h": 0.0041759656112040355
+    },
+    {
+      "target": "h3_0.1mm",
+      "tmd_offset0h": 0.0016999127125961744,
+      "tmd_offset1h": -0.0015630368441995612,
+      "imerg_offset0h": 0.024764197828762602,
+      "imerg_offset1h": 0.012339225346588267,
+      "imerg_offset6h": 0.004161925340684269
+    },
+    {
+      "target": "h3_1.0mm",
+      "tmd_offset0h": 0.019375250282481882,
+      "tmd_offset1h": 0.00461953316294661,
+      "imerg_offset0h": 0.06973289535693072,
+      "imerg_offset1h": 0.023208756427110178,
+      "imerg_offset6h": 0.003320156176267186
+    },
+    {
+      "target": "h6_0.1mm",
+      "tmd_offset0h": 0.0006884691355295569,
+      "tmd_offset1h": -0.0002319567517772292,
+      "imerg_offset0h": 0.014408018437047976,
+      "imerg_offset1h": 0.01007900251456395,
+      "imerg_offset6h": 0.005026910013802288
+    },
+    {
+      "target": "h6_1.0mm",
+      "tmd_offset0h": 0.00913074395552993,
+      "tmd_offset1h": 0.004186487487379209,
+      "imerg_offset0h": 0.030921973408901904,
+      "imerg_offset1h": 0.010359890422289408,
+      "imerg_offset6h": 0.005395656705965313
+    }
+  ],
+  "gauge_persistence": [
+    {
+      "config": "tg_persist_offset0",
+      "target": "h1_0.1mm",
+      "horizon_h": 1,
+      "threshold_mm": 0.1,
+      "probabilities": "amount",
+      "rows": 2226240,
+      "base_rate": 0.1878297038953572,
+      "roc_auc": 0.7248233685981224,
+      "pr_auc": 0.42606123289998127,
+      "pr_auc_lift": 2.268337883007826,
+      "precision": 0.5160950874753082,
+      "recall": 0.40112972732533947,
+      "f1": 0.4514075030948921,
+      "brier_score": NaN,
+      "brier_skill": NaN
+    },
+    {
+      "config": "tg_persist_offset0",
+      "target": "h3_0.1mm",
+      "horizon_h": 3,
+      "threshold_mm": 0.1,
+      "probabilities": "amount",
+      "rows": 2226240,
+      "base_rate": 0.2896920367974702,
+      "roc_auc": 0.6989312475752624,
+      "pr_auc": 0.5067769869710387,
+      "pr_auc_lift": 1.749364575476188,
+      "precision": 0.6533940911860089,
+      "recall": 0.32927445714533804,
+      "f1": 0.4378810842019527,
+      "brier_score": NaN,
+      "brier_skill": NaN
+    },
+    {
+      "config": "tg_persist_offset0",
+      "target": "h6_0.1mm",
+      "horizon_h": 6,
+      "threshold_mm": 0.1,
+      "probabilities": "amount",
+      "rows": 2226240,
+      "base_rate": 0.39250395285324136,
+      "roc_auc": 0.6846703717436657,
+      "pr_auc": 0.5833837509275386,
+      "pr_auc_lift": 1.4863130592360374,
+      "precision": 0.7581829258536765,
+      "recall": 0.2820001647959277,
+      "f1": 0.4110963001766746,
+      "brier_score": NaN,
+      "brier_skill": NaN
+    },
+    {
+      "config": "tg_persist_offset0",
+      "target": "h1_1.0mm",
+      "horizon_h": 1,
+      "threshold_mm": 1.0,
+      "probabilities": "amount",
+      "rows": 2226240,
+      "base_rate": 0.05015002874802357,
+      "roc_auc": 0.7905398160170531,
+      "pr_auc": 0.2344613665138536,
+      "pr_auc_lift": 4.675199045087163,
+      "precision": 0.2690905692120759,
+      "recall": 0.4125897927377604,
+      "f1": 0.3257363080295584,
+      "brier_score": NaN,
+      "brier_skill": NaN
+    },
+    {
+      "config": "tg_persist_offset0",
+      "target": "h3_1.0mm",
+      "horizon_h": 3,
+      "threshold_mm": 1.0,
+      "probabilities": "amount",
+      "rows": 2226240,
+      "base_rate": 0.08443204685927842,
+      "roc_auc": 0.7378564166970103,
+      "pr_auc": 0.2587628828029697,
+      "pr_auc_lift": 3.0647472426464537,
+      "precision": 0.2837902638778207,
+      "recall": 0.4376429779853803,
+      "f1": 0.3443113208534327,
+      "brier_score": NaN,
+      "brier_skill": NaN
+    },
+    {
+      "config": "tg_persist_offset0",
+      "target": "h6_1.0mm",
+      "horizon_h": 6,
+      "threshold_mm": 1.0,
+      "probabilities": "amount",
+      "rows": 2226240,
+      "base_rate": 0.12958171625700732,
+      "roc_auc": 0.6947317259770268,
+      "pr_auc": 0.28305268909420533,
+      "pr_auc_lift": 2.184356692211189,
+      "precision": 0.3389352811948087,
+      "recall": 0.38184969495285637,
+      "f1": 0.359114959428577,
+      "brier_score": NaN,
+      "brier_skill": NaN
+    }
+  ],
+  "caveats": [
+    "Gauge stamp semantics assumed: stamp t covers the hour ending at t, and the freshest deployable stamp at forecast time t is t-1. tmd_offset1h is the conservative reading; if the two disagree materially, verify TMD stamping before shipping.",
+    "Gauge matrix ends 2026-06-24; panel rows after that carry NaN gauge features.",
+    "Labels remain IMERG cells; a gauge-graded evaluation would answer a different question (see three-way label disagreement)."
+  ]
+}

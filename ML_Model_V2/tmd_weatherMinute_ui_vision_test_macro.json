@@ -1,0 +1,54 @@
+{
+  "Name": "TMD_weatherMinute_test",
+  "CreationDate": "2026-06-24",
+  "Commands": [
+    {
+      "Command": "open",
+      "Target": "http://www.aws-observation.tmd.go.th/",
+      "Value": "",
+      "Description": "Open TMD AWS home page."
+    },
+    {
+      "Command": "pause",
+      "Target": "4000",
+      "Value": "",
+      "Description": "Wait for station dropdown/map scripts to load."
+    },
+    {
+      "Command": "click",
+      "Target": "xpath=//button[contains(.,'Reports')]",
+      "Value": "",
+      "Description": "Open the Collection Data by Time Slot report."
+    },
+    {
+      "Command": "pause",
+      "Target": "5000",
+      "Value": "",
+      "Description": "Wait for the report page and grid to load."
+    },
+    {
+      "Command": "executeScript",
+      "Target": "document.querySelector('#regions').value='1'; document.querySelector('#step').value='100'; document.querySelector('#indate').value='2026/06/24'; document.querySelector('#shr').value='00'; document.querySelector('#smin').value='01'; document.querySelector('#fhr').value='01'; document.querySelector('#fmin').value='00'; if (document.querySelector('#station')) { document.querySelector('#station').disabled=false; document.querySelector('#station').value='37'; }",
+      "Value": "",
+      "Description": "Set Central, station 37, 1-minute interval, and 00:01-01:00 UTC."
+    },
+    {
+      "Command": "click",
+      "Target": "xpath=//button[contains(.,'Select')]",
+      "Value": "",
+      "Description": "Run the report query."
+    },
+    {
+      "Command": "pause",
+      "Target": "5000",
+      "Value": "",
+      "Description": "Wait for grid results."
+    },
+    {
+      "Command": "click",
+      "Target": "id=csv",
+      "Value": "",
+      "Description": "Export the grid to CSV."
+    }
+  ]
+}

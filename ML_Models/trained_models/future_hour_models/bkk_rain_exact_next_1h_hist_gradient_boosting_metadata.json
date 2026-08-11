@@ -1,0 +1,49 @@
+{
+  "model_path": "C:\\Users\\Brandon\\Documents\\Phase 1\\ML_Models\\trained_models\\future_hour_models\\bkk_rain_exact_next_1h_hist_gradient_boosting.joblib",
+  "training_table": "bkk_weather_lag_feature",
+  "target": "rain_exact_next_1h",
+  "horizon_hours": 1,
+  "rain_threshold_mm": 0.1,
+  "feature_columns": [
+    "temperature_2m",
+    "dew_point_2m",
+    "temperature_dew_point_spread",
+    "relative_humidity_2m",
+    "precipitation",
+    "precipitation_lag_1h",
+    "precipitation_lag_3h",
+    "precipitation_sum_past_3h",
+    "precipitation_sum_past_6h",
+    "cloud_cover",
+    "cloud_cover_avg_past_3h",
+    "pressure_msl",
+    "pressure_msl_change_3h",
+    "surface_pressure",
+    "wind_speed_10m",
+    "wind_speed_10m_avg_past_3h",
+    "hour_sin",
+    "hour_cos",
+    "month_sin",
+    "month_cos"
+  ],
+  "train_end_exclusive": "2024-12-07 21:00:00+00:00",
+  "validation_end_exclusive": "2025-08-27 08:00:00+00:00",
+  "metrics": {
+    "validation": {
+      "split": "validation",
+      "rows": 352744,
+      "rain_rate": 0.2020133581294083,
+      "brier_score": 0.08761154885400618,
+      "roc_auc": 0.9153926692052372,
+      "pr_auc": 0.7538245950930845
+    },
+    "test": {
+      "split": "test",
+      "rows": 352744,
+      "rain_rate": 0.20237906243621437,
+      "brier_score": 0.08816116848068722,
+      "roc_auc": 0.9131015671760173,
+      "pr_auc": 0.7558307227147687
+    }
+  }
+}

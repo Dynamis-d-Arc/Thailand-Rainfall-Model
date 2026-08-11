@@ -1,0 +1,124 @@
+{
+  "model_path": "C:\\Users\\Brandon\\Documents\\Phase 1\\ML_Models\\trained_models\\bkk_rain_next_1h_probability_hist_gradient_boosting.joblib",
+  "training_table": "bkk_rain_ml_training",
+  "target": "rain_next_1h",
+  "model_type": "hist_gradient_boosting",
+  "feature_columns": [
+    "temperature_2m",
+    "dew_point_2m",
+    "temperature_dew_point_spread",
+    "relative_humidity_2m",
+    "precipitation",
+    "precipitation_lag_1h",
+    "precipitation_lag_3h",
+    "precipitation_sum_past_3h",
+    "precipitation_sum_past_6h",
+    "cloud_cover",
+    "cloud_cover_avg_past_3h",
+    "pressure_msl",
+    "pressure_msl_change_3h",
+    "surface_pressure",
+    "wind_speed_10m",
+    "wind_speed_10m_avg_past_3h",
+    "hour_sin",
+    "hour_cos",
+    "month_sin",
+    "month_cos"
+  ],
+  "train_end_exclusive": "2024-12-07 20:00:00+00:00",
+  "validation_end_exclusive": "2025-08-27 06:00:00+00:00",
+  "metrics": {
+    "validation": {
+      "split": "validation",
+      "rows": 352688,
+      "rain_rate": 0.2017987569750034,
+      "roc_auc": 0.9152428866108855,
+      "pr_auc": 0.7536832015950603,
+      "brier_score": 0.08762722164169856,
+      "log_loss": 0.28201623678488225,
+      "confusion_matrix": [
+        [
+          267264,
+          14252
+        ],
+        [
+          28253,
+          42919
+        ]
+      ],
+      "classification_report": {
+        "0": {
+          "precision": 0.9043946710341537,
+          "recall": 0.9493741030705182,
+          "f1-score": 0.9263387015993886,
+          "support": 281516.0
+        },
+        "1": {
+          "precision": 0.7507127739588253,
+          "recall": 0.6030320912718484,
+          "f1-score": 0.6688171540325534,
+          "support": 71172.0
+        },
+        "accuracy": 0.8794827156013247,
+        "macro avg": {
+          "precision": 0.8275537224964895,
+          "recall": 0.7762030971711833,
+          "f1-score": 0.7975779278159709,
+          "support": 352688.0
+        },
+        "weighted avg": {
+          "precision": 0.8733818552347921,
+          "recall": 0.8794827156013247,
+          "f1-score": 0.874371173406122,
+          "support": 352688.0
+        }
+      }
+    },
+    "test": {
+      "split": "test",
+      "rows": 352688,
+      "rain_rate": 0.20224958036564897,
+      "roc_auc": 0.9130209063019636,
+      "pr_auc": 0.7557642939170987,
+      "brier_score": 0.0880939653129408,
+      "log_loss": 0.285575130249424,
+      "confusion_matrix": [
+        [
+          267658,
+          13699
+        ],
+        [
+          28598,
+          42733
+        ]
+      ],
+      "classification_report": {
+        "0": {
+          "precision": 0.9034686217325556,
+          "recall": 0.9513109679162061,
+          "f1-score": 0.9267727700034453,
+          "support": 281357.0
+        },
+        "1": {
+          "precision": 0.7572476609016161,
+          "recall": 0.5990803437495619,
+          "f1-score": 0.6689417123893459,
+          "support": 71331.0
+        },
+        "accuracy": 0.8800724719865717,
+        "macro avg": {
+          "precision": 0.8303581413170859,
+          "recall": 0.775195655832884,
+          "f1-score": 0.7978572411963956,
+          "support": 352688.0
+        },
+        "weighted avg": {
+          "precision": 0.873895493763836,
+          "recall": 0.8800724719865717,
+          "f1-score": 0.8746265467957621,
+          "support": 352688.0
+        }
+      }
+    }
+  }
+}

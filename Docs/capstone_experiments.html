@@ -1,0 +1,636 @@
+<title>Rainfall Nowcasting — Experiment Record</title>
+
+<style>
+  :root {
+    --paper: #fbfcfd;
+    --ink: #12181f;
+    --grey: #5a6672;
+    --grey-soft: #8b96a2;
+    --rule: #dde3e9;
+    --accent: #0d7a8a;
+    --accent-soft: #e6f2f4;
+    --warn: #a84f22;
+    --warn-soft: #f7ece5;
+    --card: #ffffff;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0e1419;
+      --ink: #e5ebf1;
+      --grey: #97a3b0;
+      --grey-soft: #6b7885;
+      --rule: #232d37;
+      --accent: #45b3c4;
+      --accent-soft: #12262b;
+      --warn: #d98354;
+      --warn-soft: #2a1c14;
+      --card: #141c23;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #0e1419;
+    --ink: #e5ebf1;
+    --grey: #97a3b0;
+    --grey-soft: #6b7885;
+    --rule: #232d37;
+    --accent: #45b3c4;
+    --accent-soft: #12262b;
+    --warn: #d98354;
+    --warn-soft: #2a1c14;
+    --card: #141c23;
+  }
+
+  :root[data-theme="light"] {
+    --paper: #fbfcfd;
+    --ink: #12181f;
+    --grey: #5a6672;
+    --grey-soft: #8b96a2;
+    --rule: #dde3e9;
+    --accent: #0d7a8a;
+    --accent-soft: #e6f2f4;
+    --warn: #a84f22;
+    --warn-soft: #f7ece5;
+    --card: #ffffff;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    margin: 0;
+    padding: 0;
+  }
+
+  .wrap {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 4rem 1.5rem 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+  }
+
+  .measure { max-width: 68ch; }
+
+  h1, h2, h3 {
+    font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    font-weight: 600;
+    text-wrap: balance;
+    margin: 0;
+    line-height: 1.25;
+  }
+
+  h1 { font-size: 2.35rem; letter-spacing: -0.015em; }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.08rem; }
+
+  p { margin: 0 0 0.9rem; }
+  p:last-child { margin-bottom: 0; }
+
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.7rem;
+  }
+
+  header .sub {
+    color: var(--grey);
+    font-size: 1.05rem;
+    margin-top: 0.9rem;
+  }
+
+  .meta {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 0.78rem;
+    color: var(--grey-soft);
+    border-top: 1px solid var(--rule);
+    padding-top: 1rem;
+    margin-top: 1.6rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.6rem;
+  }
+
+  section { display: flex; flex-direction: column; gap: 1.2rem; }
+
+  .section-head {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  /* Experiments are numbered because they form a real dependency chain:
+     each one exists because the previous produced a result that demanded it. */
+  .exp {
+    display: grid;
+    grid-template-columns: 3.2rem 1fr;
+    gap: 0 1.3rem;
+    padding: 1.5rem 0;
+    border-top: 1px solid var(--rule);
+  }
+
+  .exp-num {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 1.5rem;
+    color: var(--accent);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .exp-body { display: flex; flex-direction: column; gap: 0.85rem; min-width: 0; }
+
+  .exp-title {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .qa { display: flex; flex-direction: column; gap: 0.55rem; }
+
+  .qa-row {
+    display: grid;
+    grid-template-columns: 5.4rem 1fr;
+    gap: 0.9rem;
+    align-items: start;
+  }
+
+  .qa-label {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--grey-soft);
+    padding-top: 0.28rem;
+  }
+
+  .qa-text { min-width: 0; }
+
+  .finding {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    padding: 0.85rem 1.1rem;
+    font-size: 0.95rem;
+  }
+
+  .finding.flag {
+    background: var(--warn-soft);
+    border-left-color: var(--warn);
+  }
+
+  .scroll { overflow-x: auto; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.86rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  th, td {
+    text-align: right;
+    padding: 0.45rem 0.7rem;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+
+  th:first-child, td:first-child { text-align: left; }
+
+  thead th {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--grey);
+    border-bottom: 1.5px solid var(--ink);
+    font-weight: 600;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  code, .mono {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 0.87em;
+  }
+
+  code {
+    background: var(--accent-soft);
+    padding: 0.1em 0.36em;
+    border-radius: 2px;
+  }
+
+  .hi { color: var(--accent); font-weight: 600; }
+  .lo { color: var(--warn); font-weight: 600; }
+
+  ul { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.45rem; }
+  li::marker { color: var(--accent); }
+
+  .callout {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 1.3rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+
+  .callout.warn { border-color: var(--warn); }
+
+  .tag {
+    display: inline-block;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 0.14em 0.5em;
+    border-radius: 2px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    border: 1px solid currentColor;
+  }
+
+  .tag.gone { background: var(--warn-soft); color: var(--warn); }
+
+  .path {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 0.76rem;
+    color: var(--grey);
+    word-break: break-all;
+  }
+
+  @media (max-width: 620px) {
+    .wrap { padding: 2.5rem 1.1rem 4rem; gap: 2.2rem; }
+    h1 { font-size: 1.8rem; }
+    .exp { grid-template-columns: 1fr; gap: 0.6rem; }
+    .exp-num { font-size: 1.15rem; }
+    .qa-row { grid-template-columns: 1fr; gap: 0.15rem; }
+    .qa-label { padding-top: 0; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Capstone · Experiment Record</p>
+    <h1>Hourly rainfall nowcasting for Bangkok</h1>
+    <p class="sub measure">Eight experiments, in the order they were run. Each exists because the
+      previous one produced a result that demanded it. This record gives the motivation, the
+      change made, and the finding — the narrative spine for a methodology chapter.</p>
+    <div class="meta">
+      <span>Compiled 23 Jul 2026</span>
+      <span>8 experiments · 4 supporting analyses</span>
+      <span>PostgreSQL · LightGBM · HistGradientBoosting</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <p class="eyebrow" style="margin:0">Overview</p>
+      <h2>The arc in one paragraph</h2>
+    </div>
+    <div class="measure">
+      <p>Three independent rainfall records were available: an ECMWF forecast (Open-Meteo), a
+        satellite observation (IMERG), and a station gauge network (TMD). The first four
+        experiments built models on each source and reported strong headline metrics. The
+        middle experiments then established that those headlines were not comparable to one
+        another, and that one of them was not measuring rainfall skill at all. The final
+        experiment corrected the label source and produced a controlled demonstration that
+        the correction improved out-of-sample performance at every target.</p>
+      <p>The through-line for the report: <strong>the headline metric of a rainfall model is
+        determined as much by which record grades it as by the model itself.</strong></p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <p class="eyebrow" style="margin:0">Phase one</p>
+      <h2>Baseline models</h2>
+    </div>
+
+    <div class="exp">
+      <div class="exp-num">01</div>
+      <div class="exp-body">
+        <p class="exp-title">BKK_Rain_V1 — Open-Meteo features, Open-Meteo labels</p>
+        <div class="qa">
+          <div class="qa-row"><span class="qa-label">Why</span><span class="qa-text">Establish a
+            Bangkok baseline on the densest available grid: 56 cells at 9&nbsp;km, five years.</span></div>
+          <div class="qa-row"><span class="qa-label">Setup</span><span class="qa-text">66 features
+            (36 baseline + 30 neighbourhood), targets <code>rain_any_next_{1,2,3,6}h</code> at
+            0.1&nbsp;mm, chronological 70/15/15 split, LightGBM at 1–2&nbsp;h and
+            HistGradientBoosting at 3–6&nbsp;h.</span></div>
+          <div class="qa-row"><span class="qa-label">Result</span><span class="qa-text">Test
+            ROC-AUC 0.925 at 1&nbsp;h; F1 0.681. Best-looking model in the project.</span></div>
+        </div>
+        <p class="path">ML_Model_V2/trained_models/om_bkk_rain_any_v1/</p>
+      </div>
+    </div>
+
+    <div class="exp">
+      <div class="exp-num">02</div>
+      <div class="exp-body">
+        <p class="exp-title">Thailand_Rain_V1 — same design, national grid</p>
+        <div class="qa">
+          <div class="qa-row"><span class="qa-label">Why</span><span class="qa-text">Test whether
+            the Bangkok approach scales to 833 cells covering Thailand.</span></div>
+          <div class="qa-row"><span class="qa-label">Result</span><span class="qa-text">Test
+            ROC-AUC 0.914 at 1&nbsp;h, F1 0.787 — apparently the strongest F1 in the project.</span></div>
+        </div>
+        <div class="finding">Both the F1 and the base rate are inflated by the split landing on
+          the monsoon. Its test window rains 37.4% of hours against a validation window at 7.9%
+          — a 4.7× difference. Only 11 months of data exist, so no chronological split can be
+          seasonally representative.</div>
+      </div>
+    </div>
+
+    <div class="exp">
+      <div class="exp-num">03</div>
+      <div class="exp-body">
+        <p class="exp-title">TMD_BKK_V1 — station observations, gauge labels</p>
+        <div class="qa">
+          <div class="qa-row"><span class="qa-label">Why</span><span class="qa-text">Open-Meteo is
+            model output, not measurement. Train on physically measured data instead: 26 TMD
+            stations, 902,356 rows, 6.5 years.</span></div>
+          <div class="qa-row"><span class="qa-label">Setup</span><span class="qa-text">63 features.
+            Three data decisions worth reporting: the panel is reindexed onto a gap-free hourly
+            grid per station before any lag (coverage is 82%, and the holes are long outages, so
+            a row-order <code>shift</code> would splice lags across them); 62 negative-precipitation
+            sentinel rows are nulled rather than clipped to zero, which would fabricate dry labels;
+            and features that are ~80% null are left as NaN because the missingness is itself the
+            signal.</span></div>
+          <div class="qa-row"><span class="qa-label">Result</span><span class="qa-text">Test
+            ROC-AUC 0.899 at 1&nbsp;h, F1 0.562.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="exp">
+      <div class="exp-num">04</div>
+      <div class="exp-body">
+        <p class="exp-title">OM_BKK_V1 — three-class intensity</p>
+        <div class="qa">
+          <div class="qa-row"><span class="qa-label">Why</span><span class="qa-text">Rain/no-rain
+            is less useful than knowing how hard it will rain. Reframe as Light / Moderate /
+            Heavy.</span></div>
+          <div class="qa-row"><span class="qa-label">Result</span><span class="qa-text">Macro-F1
+            0.405, which conceals near-total failure on the rare classes.</span></div>
+        </div>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Class (1&nbsp;h)</th><th>Support</th><th>Precision</th><th>Recall</th><th>PR-AUC</th></tr></thead>
+            <tbody>
+              <tr><td>Light rain</td><td>55,920</td><td>0.962</td><td>0.843</td><td>0.979</td></tr>
+              <tr><td>Moderate rain</td><td>3,516</td><td>0.167</td><td>0.427</td><td>0.165</td></tr>
+              <tr><td>Heavy rain</td><td>387</td><td class="lo">0.047</td><td>0.220</td><td class="lo">0.043</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="finding flag">Heavy-rain precision of 0.047 means roughly 20 false alarms per
+          correct warning. This line of work was not pursued further — see the intensity limitation
+          in the closing section.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <p class="eyebrow" style="margin:0">Phase two</p>
+      <h2>Are the headline numbers real?</h2>
+    </div>
+
+    <div class="exp">
+      <div class="exp-num">05</div>
+      <div class="exp-body">
+        <p class="exp-title">Thailand_Rain_Seasonal_CV — month-blocked cross-validation</p>
+        <div class="qa">
+          <div class="qa-row"><span class="qa-label">Why</span><span class="qa-text">Experiment 02
+            showed the single chronological split hands validation and test entirely different
+            seasons. Replace it with 4 folds × 3 months, 24-hour purge, full out-of-fold
+            coverage.</span></div>
+          <div class="qa-row"><span class="qa-label">Result</span><span class="qa-text">Ranking
+            skill held (CV mean ROC 0.938 vs headline 0.914) but F1 did not: mean 0.714 against a
+            headline 0.787, worst month 0.533. The F1-optimal threshold nearly doubled across
+            seasons, 0.45 to 0.85.</span></div>
+        </div>
+        <div class="finding">Left one question open, and stated it explicitly: with only 12 months
+          of data, every held-out block is <em>also</em> a season the model never trained on.
+          Degradation confounds "harder season" with "unfamiliar season."</div>
+      </div>
+    </div>
+
+    <div class="exp">
+      <div class="exp-num">06</div>
+      <div class="exp-body">
+        <p class="exp-title">BKK_RAIN_CV1 &amp; TMD_BKK_CV1 — separating the two effects</p>
+        <div class="qa">
+          <div class="qa-row"><span class="qa-label">Why</span><span class="qa-text">Resolve the
+            confound left by 05. The Bangkok datasets span 5 and 6.5 years, so a season can be
+            held out in one year while remaining in training in others.</span></div>
+          <div class="qa-row"><span class="qa-label">Setup</span><span class="qa-text">Part&nbsp;A
+            holds out one calendar <em>year</em> (season seen elsewhere). Part&nbsp;B holds out one
+            calendar <em>quarter</em> across all years (season never seen). Part&nbsp;C is A−B on
+            identical rows. A volume-matched control rules out the training-set size difference.</span></div>
+        </div>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Cost of an unseen season (ROC-AUC)</th><th>1&nbsp;h</th><th>3&nbsp;h</th><th>6&nbsp;h</th></tr></thead>
+            <tbody>
+              <tr><td>BKK_RAIN_CV1</td><td>+0.0017</td><td>+0.0026</td><td>+0.0037</td></tr>
+              <tr><td>TMD_BKK_CV1</td><td>+0.0016</td><td>+0.0006</td><td>−0.0012</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="finding">Holding out an entire season costs essentially nothing — replicated
+          across two datasets with different sources, labels and features. Thailand's seasonal
+          degradation was intrinsic month difficulty, not unfamiliarity. The volume control
+          attributes 0.0002 ROC-AUC to training-set size.</div>
+        <div class="finding flag">TMD_BKK_V1's Brier skill is <span class="lo">−1.03</span> at
+          1&nbsp;h and −0.83 at 2&nbsp;h under honest CV — worse than always predicting the base
+          rate. Confirmed as intrinsic to <code>scale_pos_weight</code>, not an artefact of the
+          split. This is the finding that motivated calibration in experiment 08.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <p class="eyebrow" style="margin:0">Phase three</p>
+      <h2>Correcting the label source</h2>
+    </div>
+
+    <div class="exp">
+      <div class="exp-num">07</div>
+      <div class="exp-body">
+        <p class="exp-title">Cross-source label agreement</p>
+        <div class="qa">
+          <div class="qa-row"><span class="qa-label">Why</span><span class="qa-text">Experiments
+            01–03 report metrics against three different records. Establish whether those records
+            agree before treating the metrics as comparable.</span></div>
+          <div class="qa-row"><span class="qa-label">Result</span><span class="qa-text">They agree
+            poorly. On rainy hours the three overlap on only 11–19% of cases. Open-Meteo and IMERG
+            correlate at 0.18 and peak about five hours apart. Model rankings flip depending on
+            which record grades them.</span></div>
+        </div>
+        <div class="callout warn">
+          <p><span class="tag gone">Artifacts deleted</span></p>
+          <p>This analysis was reverted at the end of the session and its output files no longer
+            exist on disk. The findings are sound but <strong>not currently reproducible</strong>.
+            Re-run before citing any specific agreement statistic in the report — the scripts are
+            deterministic and take about two minutes.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="exp">
+      <div class="exp-num">08</div>
+      <div class="exp-body">
+        <p class="exp-title">BKK_Rain_V2 — same features, observed labels</p>
+        <div class="qa">
+          <div class="qa-row"><span class="qa-label">Why</span><span class="qa-text">V1 trains
+            Open-Meteo <code>precipitation</code> → Open-Meteo rain labels. The label is ECMWF
+            forecast output, and it also feeds the model's own <code>precipitation*</code> features
+            — so the model is substantially graded on reproducing a forecast derived from its own
+            inputs. IMERG is an independent satellite observation.</span></div>
+          <div class="qa-row"><span class="qa-label">Changed</span><span class="qa-text">Labels
+            moved to IMERG; thresholds 0.1&nbsp;mm <em>and</em> 1.0&nbsp;mm both built; isotonic
+            calibration fitted inside each fold; leave-one-year-out CV replacing the single split;
+            operating thresholds selected on other years only. <strong>Features and
+            hyperparameters unchanged</strong>, so the label is the sole variable.</span></div>
+        </div>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Graded on IMERG, V1's own test window</th><th>V1 ROC</th><th>V2 ROC</th><th>Δ</th><th>V1 lift</th><th>V2 lift</th></tr></thead>
+            <tbody>
+              <tr><td>1&nbsp;h @ 0.1&nbsp;mm</td><td>0.760</td><td class="hi">0.828</td><td>+0.068</td><td>2.67</td><td>3.32</td></tr>
+              <tr><td>1&nbsp;h @ 1.0&nbsp;mm</td><td>0.813</td><td class="hi">0.862</td><td>+0.049</td><td>3.92</td><td>5.47</td></tr>
+              <tr><td>3&nbsp;h @ 0.1&nbsp;mm</td><td>0.769</td><td class="hi">0.826</td><td>+0.057</td><td>2.35</td><td>2.68</td></tr>
+              <tr><td>3&nbsp;h @ 1.0&nbsp;mm</td><td>0.807</td><td class="hi">0.849</td><td>+0.042</td><td>3.60</td><td>4.61</td></tr>
+              <tr><td>6&nbsp;h @ 0.1&nbsp;mm</td><td>0.767</td><td class="hi">0.830</td><td>+0.062</td><td>2.06</td><td>2.29</td></tr>
+              <tr><td>6&nbsp;h @ 1.0&nbsp;mm</td><td>0.793</td><td class="hi">0.833</td><td>+0.041</td><td>2.96</td><td>3.63</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="finding">V2 wins at all six targets on identical out-of-sample rows
+          (367,808 rows, both models strictly out-of-sample). Note that V1 scores 0.76–0.81 here
+          against its own reported 0.925 — that gap is the cost of grading a model on a forecast
+          partly derived from its own inputs.</div>
+        <div class="finding">Isotonic calibration rescued exactly the models predicted to need it.
+          <code>h1_1.0mm</code> Brier skill moved from <span class="lo">−1.71</span> to
+          <span class="hi">+0.12</span>, and <code>h1_0.1mm</code> from −0.07 to +0.26, while the
+          HistGradientBoosting targets were untouched — confirming <code>scale_pos_weight</code>
+          as the cause. ROC cost was nil (0.8721 → 0.8716).</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <p class="eyebrow" style="margin:0">Result</p>
+      <h2>Final V2 performance</h2>
+    </div>
+    <p class="measure">Out-of-fold across 2,453,360 rows, calibrated probabilities,
+      leave-one-year-out thresholds. Six targets from a single feature set.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Target</th><th>Base rate</th><th>ROC</th><th>PR-AUC</th><th>Lift</th><th>Precision</th><th>Recall</th><th>F1</th><th>Brier skill</th></tr></thead>
+        <tbody>
+          <tr><td>h1 @ 0.1&nbsp;mm</td><td>0.178</td><td>0.850</td><td>0.551</td><td>3.10</td><td>0.450</td><td>0.687</td><td>0.544</td><td>+0.255</td></tr>
+          <tr><td>h3 @ 0.1&nbsp;mm</td><td>0.275</td><td>0.852</td><td>0.675</td><td>2.46</td><td>0.550</td><td>0.782</td><td>0.646</td><td>+0.319</td></tr>
+          <tr><td>h6 @ 0.1&nbsp;mm</td><td>0.373</td><td>0.862</td><td>0.774</td><td>2.07</td><td>0.654</td><td>0.819</td><td class="hi">0.727</td><td>+0.375</td></tr>
+          <tr><td>h1 @ 1.0&nbsp;mm</td><td>0.048</td><td class="hi">0.872</td><td>0.271</td><td class="hi">5.66</td><td>0.270</td><td>0.432</td><td>0.333</td><td>+0.116</td></tr>
+          <tr><td>h3 @ 1.0&nbsp;mm</td><td>0.081</td><td>0.859</td><td>0.344</td><td>4.26</td><td>0.320</td><td>0.517</td><td>0.396</td><td>+0.158</td></tr>
+          <tr><td>h6 @ 1.0&nbsp;mm</td><td>0.124</td><td>0.844</td><td>0.415</td><td>3.35</td><td>0.354</td><td>0.640</td><td>0.456</td><td>+0.186</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <p class="eyebrow" style="margin:0">Methodological note</p>
+      <h2>Which metrics may be compared across targets</h2>
+    </div>
+    <div class="measure">
+      <p>The single most defensible methodological point in this project, and the one most likely
+        to be challenged. PR-AUC's floor <em>is</em> the base rate, and precision, recall and F1 all
+        move with class balance. Only base-rate-independent measures can be compared between
+        targets with different rain frequencies.</p>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Metric</th><th>Comparable across base rates?</th></tr></thead>
+        <tbody>
+          <tr><td>ROC-AUC</td><td class="hi">Yes</td></tr>
+          <tr><td>PR-AUC ÷ base rate (lift)</td><td class="hi">Yes</td></tr>
+          <tr><td>Brier <em>skill</em></td><td class="hi">Yes</td></tr>
+          <tr><td>PR-AUC, F1, precision, recall, raw Brier</td><td class="lo">No</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <p><strong>Supporting simulation.</strong> A synthetic model with separability fixed by
+        construction was scored at both V2 base rates. ROC held flat (0.863 → 0.865, confirming
+        skill was unchanged) while F1 fell from 0.588 to 0.382 — a 35% drop caused by rarity
+        alone. V2's observed drop across the same base rates is 39%, with recall landing on 0.432
+        in both cases.</p>
+      <p>This licenses the report's key claim: <strong>the lower F1 at 1.0&nbsp;mm reflects a 4.8%
+        base rate, not reduced model skill.</strong> ROC rises (0.850 → 0.872) and lift nearly
+        doubles (3.10 → 5.66) over the same change.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <p class="eyebrow" style="margin:0">Limitations</p>
+      <h2>State these before you are asked</h2>
+    </div>
+    <ul class="measure">
+      <li><strong>Spatial mismatch.</strong> IMERG measures area-averaged rain over an ~11&nbsp;km
+        cell; a gauge measures a point. These are different physical quantities. V2 predicts "rain
+        somewhere in the cell", not "rain at this location."</li>
+      <li><strong>No intensity capability.</strong> For gauge-hours above 10&nbsp;mm, IMERG reports
+        at least half the gauge amount only 2.9% of the time. This model can distinguish rain from
+        no-rain; it can never become a heavy-rain warning system. Experiment 04 is the empirical
+        confirmation.</li>
+      <li><strong>Provisional data.</strong> Everything after 2025-10-01 is IMERG Late Run, with
+        roughly 12% lower detection when controlled for season. That covers the final CV fold and
+        all future data.</li>
+      <li><strong>Features remain forecast output.</strong> V2 corrects the label but its inputs
+        are still ECMWF. The model inherits any systematic bias in that forecast; it has simply
+        stopped being graded on reproducing it.</li>
+      <li><strong>Single region.</strong> All V2 conclusions are Bangkok-specific, 56 grid cells.
+        The national grid was not re-run with IMERG labels.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <p class="eyebrow" style="margin:0">Status</p>
+      <h2>Not yet done</h2>
+    </div>
+    <ul class="measure">
+      <li><strong>No deployable model exists.</strong> The V2 cross-validation fits were used for
+        scoring and discarded — the output directory contains metrics but zero <code>.joblib</code>
+        files. A final fit on all rows, with its calibrator and threshold, is the immediate next
+        step.</li>
+      <li><strong>Provisional-period validation.</strong> Whether V2's skill holds on Late Run data
+        has not been tested separately.</li>
+      <li><strong>TMD calibration.</strong> The isotonic recipe from experiment 08 transfers
+        directly to TMD_BKK_V1, whose probabilities remain unusable as probabilities.</li>
+      <li><strong>Version control.</strong> The project is not under source control; the
+        <code>.git</code> directory is empty.</li>
+    </ul>
+  </section>
+
+</div>

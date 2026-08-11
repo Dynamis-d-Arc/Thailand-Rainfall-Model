@@ -1,0 +1,17 @@
+{
+  "label_to_id": {
+    "Light rain": 0,
+    "Moderate rain": 1,
+    "Heavy rain": 2
+  },
+  "id_to_label": {
+    "0": "Light rain",
+    "1": "Moderate rain",
+    "2": "Heavy rain"
+  },
+  "ordered_labels": [
+    "Light rain",
+    "Moderate rain",
+    "Heavy rain"
+  ]
+}

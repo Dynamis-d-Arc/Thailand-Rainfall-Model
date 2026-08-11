@@ -1,0 +1,135 @@
+{
+  "purpose": "year-blocked and season-blocked CV; separates 'harder season' from 'season never trained on', which Thailand_Rain_Seasonal_CV could not",
+  "source_table": "\"BKK_TMD_WEATHER_DATA\"",
+  "spatial_table": "\"BKK_TMD_SPATIAL_FEATURES_100KM\"",
+  "rows": 902356,
+  "span_utc": [
+    "2020-01-02T01:00:00",
+    "2026-06-24T03:00:00"
+  ],
+  "local_offset_hours": 7,
+  "purge_hours": 24,
+  "part_a_year_folds": [
+    "2020",
+    "2021",
+    "2022",
+    "2023",
+    "2024",
+    "2025"
+  ],
+  "part_b_quarter_folds": {
+    "1": [
+      1,
+      2,
+      3
+    ],
+    "2": [
+      4,
+      5,
+      6
+    ],
+    "3": [
+      7,
+      8,
+      9
+    ],
+    "4": [
+      10,
+      11,
+      12
+    ]
+  },
+  "volume_control_horizon": 1,
+  "volume_control_train_rows": 672124,
+  "model_plan": {
+    "1": "lightgbm",
+    "2": "lightgbm",
+    "3": "hist_gradient_boosting",
+    "6": "hist_gradient_boosting"
+  },
+  "v1_thresholds_used": {
+    "3": 0.30000000000000004,
+    "6": 0.30000000000000004,
+    "1": 0.8500000000000002,
+    "2": 0.8000000000000002
+  },
+  "oof_coverage_a": 0.9805331820257194,
+  "oof_coverage_b": 1.0,
+  "summary_vs_v1": [
+    {
+      "horizon_h": 1,
+      "V1_headline_roc_auc": 0.8987649926617468,
+      "V1_test_rain_rate": 0.0733609184684422,
+      "V1_brier_skill": -0.8319961285228594,
+      "CV_mean_roc_auc": 0.8993618643139937,
+      "CV_worst_month_roc_auc": 0.6304888600475882,
+      "CV_worst_month": "2025-01",
+      "V1_headline_f1": 0.5621864164797064,
+      "CV_mean_f1": 0.4867056225555007,
+      "CV_worst_month_f1": 0.0,
+      "f1_spread": 0.6666666666666666,
+      "best_threshold_min": 0.1,
+      "best_threshold_max": 0.9000000000000002,
+      "CV_mean_brier_skill": -1.0323275068172257,
+      "mean_cost_of_unseen_season_roc": 0.001629584087320964
+    },
+    {
+      "horizon_h": 2,
+      "V1_headline_roc_auc": 0.8690993955516098,
+      "V1_test_rain_rate": 0.1075120927792994,
+      "V1_brier_skill": -0.6254565523566875,
+      "CV_mean_roc_auc": 0.8729162436602996,
+      "CV_worst_month_roc_auc": 0.6376716660643295,
+      "CV_worst_month": "2020-01",
+      "V1_headline_f1": 0.5327886710239651,
+      "CV_mean_f1": 0.44696568585434215,
+      "CV_worst_month_f1": 0.0,
+      "f1_spread": 0.6240848270638728,
+      "best_threshold_min": 0.1,
+      "best_threshold_max": 0.9000000000000002,
+      "CV_mean_brier_skill": -0.8295146813866107,
+      "mean_cost_of_unseen_season_roc": 0.0011931277811357093
+    },
+    {
+      "horizon_h": 3,
+      "V1_headline_roc_auc": 0.8485956072488989,
+      "V1_test_rain_rate": 0.1363948948073897,
+      "V1_brier_skill": 0.28786458260593684,
+      "CV_mean_roc_auc": 0.8501473478315281,
+      "CV_worst_month_roc_auc": 0.6288872370537419,
+      "CV_worst_month": "2020-02",
+      "V1_headline_f1": 0.5229072268753718,
+      "CV_mean_f1": 0.42147152556936607,
+      "CV_worst_month_f1": 0.0,
+      "f1_spread": 0.6331811263318112,
+      "best_threshold_min": 0.1,
+      "best_threshold_max": 0.5000000000000001,
+      "CV_mean_brier_skill": 0.22134145785402856,
+      "mean_cost_of_unseen_season_roc": 0.0005570042949534874
+    },
+    {
+      "horizon_h": 6,
+      "V1_headline_roc_auc": 0.8155695368123062,
+      "V1_test_rain_rate": 0.2083804417506847,
+      "V1_brier_skill": 0.2497972650367104,
+      "CV_mean_roc_auc": 0.8134528583183238,
+      "CV_worst_month_roc_auc": 0.5747495112414467,
+      "CV_worst_month": "2020-02",
+      "V1_headline_f1": 0.5325221884245177,
+      "CV_mean_f1": 0.4014731642043871,
+      "CV_worst_month_f1": 0.0,
+      "f1_spread": 0.6600234466588512,
+      "best_threshold_min": 0.1,
+      "best_threshold_max": 0.3500000000000001,
+      "CV_mean_brier_skill": 0.17710092744304187,
+      "mean_cost_of_unseen_season_roc": -0.0011660913756980455
+    }
+  ],
+  "mean_cost_of_unseen_season_roc_by_horizon": {
+    "1": 0.001629584087320964,
+    "2": 0.0011931277811357093,
+    "3": 0.0005570042949534874,
+    "6": -0.0011660913756980455
+  },
+  "caveat": "Part A and Part B train on different row counts; section 6 measures that confound at 1h only. Labels are the TMD station gauge, a point measurement: two gauges 8 km apart agree on rainy hours at only CSI 0.45, so there is a hard ceiling here that no split scheme can lift."
+}

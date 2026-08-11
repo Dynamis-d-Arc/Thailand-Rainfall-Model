@@ -1,0 +1,6 @@
+earthaccess
+harmony-py
+netCDF4
+numpy
+psycopg2-binary
+earthengine-api

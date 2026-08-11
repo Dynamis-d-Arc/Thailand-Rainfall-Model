@@ -1,0 +1,5 @@
+horizon_h,target_column,rain_threshold_mm,rows,rain_rows,rain_rate
+1,rain_any_next_1h,0.1,1826881,106344,0.05821068805247851
+2,rain_any_next_2h,0.1,1826881,152989,0.08374327610829606
+3,rain_any_next_3h,0.1,1826881,191641,0.10490064760649435
+6,rain_any_next_6h,0.1,1826881,285571,0.1563161475761147

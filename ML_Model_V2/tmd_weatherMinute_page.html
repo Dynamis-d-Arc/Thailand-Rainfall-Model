@@ -1,0 +1,1635 @@
+
+
+
+<!DOCTYPE html>
+<html lang="">
+	<head>
+		
+
+
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	 <title>Thai Meteorological Department</title>
+	<meta name="description" content="">
+	<meta name="keywords" content="">
+	<!-- <link rel="stylesheet" type="text/css" href="/css/basic.css"> -->
+	<link rel="stylesheet" type="text/css" href="/css/jquery.datetimepicker.css"/ >
+	<link rel="stylesheet" href="http://code.jquery.com/ui/1.10.3/themes/smoothness/jquery-ui.css">
+	<!-- <link rel="stylesheet" type="text/css" href="/css/jquery-ui.css"/ > -->
+	
+	<link rel="stylesheet" type="text/css" href="/css/jqx.base.css"/ >
+	
+	 <!-- App favicon -->
+    <link rel="shortcut icon" href="/images/favicon.ico">
+    <!-- Bootstrap Css -->
+    <link href="/css/bootstrap.min.css" id="bootstrap-style" rel="stylesheet" type="text/css" />
+    <!-- Icons Css -->
+    <link href="/css/icons.min.css" rel="stylesheet" type="text/css" />
+    <!-- App Css-->
+    <link href="/css/app.min.css" id="app-style" rel="stylesheet" type="text/css" />
+
+	<script type="text/javascript" src="/js/jquery.min.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+	<script type="text/javascript" src="/js/jquery-ui.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+	<script type="text/javascript" src="/js/jquery.blockUI.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+	<script type="text/javascript" src="/js/jquery.tmpl.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+	<script type="text/javascript" src="/js/jquery.mask.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+	
+	<script type="text/javascript" src="/js/jquery.fileDownload.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+	<script type="text/javascript" src="/js/jquery.serializeObject.min.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+	
+
+
+<script type="text/javascript" src="/js/jqxGrid/jqx-all.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+<script type="text/javascript" src="/js/jqxGrid/jqxexport.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+
+<script type="text/javascript" src="/js/jszip/jszip.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	
+	<!-- Util -->
+	<script type="text/javascript" src="/js/util/commonUtil.js;jsessionid=0279AF6F9309747C551B165A92189530?version=20211119"></script>
+	
+	<script type="text/javascript" src="/js/util/jquery.datetimepicker.full.min.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+	<script type="text/javascript" src="/js/util/validate.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+	
+	<script type="text/javascript" src="/js/util/weather.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+	<script type="text/javascript" src="/js/util/synop.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+	<script type="text/javascript" src="/js/util/grid.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+	
+	
+	<script type="text/javascript" src="/js/common.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+	<script type="text/javascript" src="/js/custom.js;jsessionid=0279AF6F9309747C551B165A92189530?version=202105329"></script>
+	<script type="text/javascript" src="/js/util/SunRiseSet.js;jsessionid=0279AF6F9309747C551B165A92189530"></script>
+	<!-- JAVASCRIPT -->
+   
+	<style>     
+         .green {
+            color: black\9;
+           
+            border-collapse:collapse;
+            caption-side: bottom;
+           
+        } 
+        
+
+        .green:not(.jqx-grid-cell-hover):not(.jqx-grid-cell-selected), .jqx-widget .green:not(.jqx-grid-cell-hover):not(.jqx-grid-cell-selected) {
+            color: black;
+            background-color: #dff6fd;
+            border-collapse:collapse;
+            /* font-weight:bold; */
+            caption-side: bottom;
+            /* color:#038edc; */
+            
+        }
+        .firstCell {
+            color: #038edc;
+           	font-weight:bold;
+            border-collapse:collapse;
+            caption-side: bottom;
+           
+        } 
+        
+        .awsc1{
+		    font-weight: normal;
+		    background-color:#75bfea;
+		    color: #005c99;
+		    text-align: center;
+		}	
+        
+    </style>
+    
+	</head>
+
+	
+			<!-- header -->
+			
+			
+				
+				
+					<body data-sidebar="dark" data-layout-size="boxed" data-layout-scrollable="false">
+			<!-- ===== wrap ====== -->
+					<div id="layout-wrapper">
+
+
+				
+			
+					
+
+
+<script>
+const curr_dt = new Date();
+const utc_time = curr_dt.getTime() + (curr_dt.getTimezoneOffset() * 60 * 1000);
+const TIME_DIFF = 7 * 60 * 60 * 1000;
+const utc_dt = new Date(utc_time);
+const local_dt = new Date(utc_time + (TIME_DIFF));
+
+var source = {};
+var column = [];
+var columngroup = [];
+
+var O_WS = 'm/s';
+var U_WS = 'knot';
+var U_WS_SYM = 'knot';
+var O_TEMP = 'C';
+var U_TEMP = 'C';
+var U_TEMP_SYM = '°C';
+var O_VIS = 'm';
+var U_VIS = 'm';
+var U_VIS_SYM = 'm';
+var C_WS = '';
+var C_DT = DateTimeStrKR(local_dt);
+var G_DT = DateTimeStrKR(utc_dt);
+var N_DT = G_DT;
+var S_YEAR = '2007';
+var C_REGION = '1';
+var C_STATION = '37';
+var CALM_WS = '';
+var MAP_TOKEN = "pk.eyJ1IjoidG1kYXdzIiwiYSI6ImNsNWMya3ZodTBka2MzbW9lN3B0bDNqZm0ifQ.NOrijuz8JixAcDJTeTSnHw";
+var MAP_LAT = 13.31553;
+var MAP_LON = 101.50;
+var M_REGION = '';
+var M_STATION = '';
+var M_TYPE = ''
+var SECTIME00 = '';
+var SECTIME24 = '';
+
+	function DateTimeStrKR(dt) {
+		var yyyy = dt.getFullYear();
+		var mm = ('0' + (dt.getMonth() + 1)).slice(-2);
+		var dd = ('0' + dt.getDate()).slice(-2);
+		
+		var hh = ('0' + dt.getHours()).slice(-2); 
+		var nn = ('0' + dt.getMinutes()).slice(-2);
+		var ss = ('0' + dt.getSeconds()).slice(-2); 
+		
+		DTStr = yyyy+'/'+mm+'/'+dd+ ' ' +hh+':'+nn+':'+ss;	
+		
+		return DTStr; 
+	}
+
+	/* $(function(){
+		// ????? ??
+		history.pushState(null, null, location.href);
+		window.onpopstate = function () {
+			history.go(1);
+		};
+
+	}); */
+	$(function(){
+		$.datetimepicker.setLocale('en');
+
+		jQuery('#indate').datetimepicker({
+            format:'Y/m/d',
+            timepicker:false,
+            yearStart:S_YEAR,
+            yearEnd:N_DT.substring(0,4)
+			});
+
+		$("#jqxLoader").jqxLoader({ isModal: true, width: 100, height: 60, imagePosition: 'top' });
+        $('#jqxLoader').jqxLoader('open');
+	});
+	function fnLogout(){
+		//if(!confirm("Are you sure you want to Log off?")){
+		//	return false;
+		//}
+		 
+		var jData = $("#logoutFrm").serialize();
+		$("#headerFrm").attr("action", "/login/logout");
+		$("#headerFrm").attr("method", "GET");
+		fn_submitAjax($("#headerFrm"), jData, fnLogoutCallBack, 'json');
+	}
+
+	function fnLogoutCallBack(result){
+		$('#jqxLoader').jqxLoader('close');
+
+		if(result.resultCode == "200") {
+			//alert(result.resultMessage);
+			// ??? ??
+			fn_homeMove();
+		} else {
+			alert(result.resultMessage);
+		}
+	}
+	
+	function fn_subCity($formObj,obj){
+		$('#jqxLoader').jqxLoader('open');
+		if(obj){
+			$("#regions").val(obj);
+			var jData = $formObj.serialize();
+			$formObj.attr("method", "POST");
+			$formObj.attr("action", "/comm/siteListData;jsessionid=0279AF6F9309747C551B165A92189530");
+			fn_submitAjax($formObj, jData, fn_subCityCallBack, 'json','','',false);
+		}else{
+			fn_subCityCallBack('');
+
+			$('#jqxLoader').jqxLoader('close');
+		}
+	}
+
+	function fn_subCityCallBack(result){
+		$("#station").empty();
+		
+		if(result.resultCode == "200"){
+			if(result.data.length > 0){
+				
+				 $("#station").attr("disabled", false); //??
+
+                var html = "";
+                var sel = "";
+                var vol = "";
+				for(var i = 0; i < result.data.length; i++){
+                    sel = '';
+
+					vol = result.data[i].awsid;
+                    M_STATION = '37';
+
+                    if(M_STATION && M_STATION.length > 0){
+                        if(M_STATION == vol){
+                            sel = "selected";
+                        }
+                    }else{
+                        if(C_STATION == vol){
+                            sel = "selected";
+                        }
+                    }
+
+                    vol = fillZero(4, vol);
+
+					html = html + "<option "+sel+" value='"+result.data[i].awsid+"'>"+vol+"."+result.data[i].fname+"</option>";
+				}
+                $("#station").append(html);
+				
+			}else{
+				$("#station").append('<option >::Select Regions::</option>');
+				$("#station").attr("disabled", true); //??
+			}
+		}else{
+			$("#station").append('<option >::Select Regions::</option>');
+			$("#station").attr("disabled", true); //??
+		}
+		
+		$('#jqxLoader').jqxLoader('close');
+	}
+
+function fn_goMain2(obj, mId, pId){
+    $("#headerFrm").attr("action", obj);
+    $("#headerFrm").attr("method", "GET");
+    $("#headerFrm").submit();
+
+}
+
+function fnGoMbrReg(){
+    window.open('/login/mbrReg;jsessionid=0279AF6F9309747C551B165A92189530', 'windowPop', 'width=400, height=800, left=400, top=400, resizable = yes');
+}
+</script>
+<div id="jqxLoader"></div>
+<form id="headerFrm"></form>
+
+<!-- ========== header start ========== -->
+        <header id="page-topbar">
+            <div class="navbar-header">
+                <div class="d-flex">
+                    <!--<h4><span style="color: #FF4848;">&nbsp&nbsp&nbsp&nbspWebsite is currently under development. ????????????????????????????????? </span></h4>-->
+                    <!-- LOGO -->
+                    <div class="navbar-brand-box">
+                        <a href="javascript:fn_goMain('/main/main','0','0');" class="logo logo-dark">
+                            <span class="logo-sm">
+                                <img src="/images/logo-sm.png" alt="" height="34">
+                            </span>
+                            <span class="logo-lg">
+                                <img src="/images/logo-dark.png" alt="" height="34">
+                            </span>
+                        </a>
+        
+                        <a href="javascript:fn_goMain('/main/main','0','0');" class="logo logo-light">
+                            <span class="logo-sm">
+                                <img src="/images/logo-sm.png" alt="" height="34">
+                            </span>
+                            <span class="logo-lg">
+                                <img src="/images/logo-light.png" alt="" height="34">
+                            </span>
+                        </a>
+                    </div>
+        
+                    <button type="button" class="btn btn-sm px-3 font-size-16 header-item vertical-menu-btn">
+                        <i class="fa fa-fw fa-bars"></i>
+                    </button>
+        
+        
+                </div>
+                <div class="d-flex ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    <div>
+                        <button type="button" class="btn header-item" onclick="fn_goMain2('/main/main','0','0');">
+                            <i class="icon-sm " data-feather="home"></i>
+                            </a>
+                        </button>
+                    </div>
+                    <!--sitemap start -->
+
+
+
+
+
+
+
+
+
+
+
+                    <!--sitemap end -->
+
+                    <div class="dropdown d-inline-block">
+                        <button type="button" class="btn header-item user text-start d-flex align-items-center"
+                            id="page-header-user-dropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                            <i class="icon-sm" data-feather="user"></i>
+                            <!-- 
+                        <span class="ms-2 d-none d-sm-block user-item-desc">
+                            <span class="user-name">admin</span>
+                            <span class="user-sub-title">Administrator</span>
+                        </span>
+                        -->
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end pt-0">
+                            <!--  -->
+                            <div class="dropdown-divider"></div>
+                            
+								
+									
+									<a class="dropdown-item" href="/login/login"><i
+						                                    class="mdi mdi-login text-muted font-size-16 align-middle me-1"></i> <span
+						                                    class="align-middle">Login</span></a>
+								
+								
+							
+                           
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- ========== header end ========== -->
+	
+
+
+					
+
+
+
+<script>
+    $("#wthrM").hide();
+    $("climM").hide();
+
+    function fn_goPage(obj){
+        $("#leftMenuFrm").attr("action", obj);
+        $("#leftMenuFrm").attr("method", "POST");
+        $("#leftMenuFrm").submit();
+    }
+
+    function fn_goPage2(obj, mId, pId){
+
+        $("#menuId").val(mId);
+        $("#pageId").val(pId);
+        $("#leftMenuFrm").attr("action", obj);
+        $("#leftMenuFrm").attr("method", "POST");
+        $("#leftMenuFrm").submit();
+    }
+
+    function fn_goMain(obj, mId, pId){
+        $("#leftMenuFrm").attr("action", obj);
+        $("#leftMenuFrm").attr("method", "GET");
+        $("#leftMenuFrm").submit();
+
+    }
+</script>
+<form id="leftMenuFrm">
+    <input type="hidden" name="menuId" id="menuId" />
+    <input type="hidden" name="pageId" id="pageId" />
+</form>
+
+<!-- ========== Left Sidebar Start ========== -->
+<div class="vertical-menu">
+    <!-- LOGO -->
+    <div class="navbar-brand-box">
+        <a href="javascript:fn_goMain('/main/main','0','0');" class="logo logo-dark">
+                    <span class="logo-sm">
+                        <img src="/images/logo-sm.png" alt="" height="34">
+                    </span>
+            <span class="logo-lg">
+                        <img src="/images/logo-dark.png" alt="" height="34">
+                    </span>
+        </a>
+
+        <a href="javascript:fn_goMain('/main/main','0','0');" class="logo logo-light">
+                    <span class="logo-lg">
+            
+                
+                
+                    <img src="/images/logo-light.png" alt="" height="34">
+                
+            
+                    </span>
+            <span class="logo-sm">
+                        <img src="/images/logo-sm-light.png" alt="" height="34">
+                    </span>
+        </a>
+    </div>
+    <button type="button" class="btn btn-sm font-size-16 header-item vertical-menu-btn">
+        <i class="fa fa-fw fa-bars"></i>
+    </button>
+
+
+    <div data-simplebar class="sidebar-menu-scroll">
+        <!--- Sidemenu -->
+        <div id="sidebar-menu">
+            <!-- Left Menu Start -->
+            <ul class="metismenu list-unstyled" id="side-menu">
+                
+                    
+                <li >
+                    
+
+                    <a href="javascript:fn_goMain('/main/main','0','0');">
+                        <i class="nav-icon fas fa-home"></i>
+                        <span class="menu-item" id="#">Home</span>
+                    </a>
+                </li>
+
+                
+                    
+                <li >
+                    
+                    <a href="javascript: void(0);" class="has-arrow" aria-expanded="false">
+                        <i class="nav-icon fas fa-cloud-sun"></i>
+                        <span class="menu-item" id="#">Weather</span>
+                    </a>
+                    <ul class="sub-menu" aria-expanded="false">
+                        
+                            <li class="mm-active"><a href="javascript:fn_goPage2('/wthr/wthrCity','1','1');" data-key="t-inbox" class="active">Weather by City</a></li>
+                        
+                        
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/wthr/wthrCal','1','2');" data-key="t-read-email">Weather Calendar</a></li>
+                        
+
+                    </ul>
+                </li>
+                
+                    
+                <li >
+                    
+
+                    <a href="javascript: void(0);" class="has-arrow" aria-expanded="false">
+                        <i class="nav-icon fas fa-globe"></i>
+                        <span class="menu-item" id="Climate Data">Climate Data</span>
+                    </a>
+                    <ul class="sub-menu" aria-expanded="false">
+                        
+                            <li class="mm-active"><a href="javascript:fn_goPage2('/clim/climPast','2', '1');" data-key="t-inbox" class="active">Search of Past Data</a></li>
+                        
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/clim/climPastCity','2', '2');">Search of Past Data by Region</a></li>
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/clim/climPastExtDay','2', '3');">Extreme Weather (Day)</a></li>
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/clim/climPastExtMonth','2', '4');">Extreme Weather (Month)</a></li>
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/clim/climPastExtYear','2','5');">Extreme Weather (Year)</a></li>
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/clim/climMapPeriod','2','6');">Contour Map (Period)</a></li>
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/clim/climMapMonthDstrb','2','7');">Contour Map (Month)</a></li>
+                        
+
+                        
+                        
+                            <li ><a href="javascript:fn_goPage2('/clim/climMapYears','2','8');">Contour Map (Year)</a></li>
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/clim/climAvrg','2','9');">The Normal Year</a></li>
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/clim/climRprtMonth','2','10');">Deviation Weather (Month)</a></li>
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/clim/climRprtAnn','2','11');">Deviation Weather (Year)</a></li>
+                        
+                    </ul>
+                </li>
+                
+                    
+                <li >
+                    
+
+                    <a href="javascript: void(0);" class="has-arrow" aria-expanded="false">
+                        <i class="nav-icon fas fa-digital-tachograph"></i>
+                        <span class="menu-item" id="AWS">AWS</span>
+                    </a>
+                    <ul class="sub-menu" aria-expanded="false">
+                        
+                            <li class="mm-active"><a href="javascript:fn_goPage2('/aws/awsAlphn','3','1');" data-key="t-inbox" class="active">Alphanumeric</a></li>
+                        
+                        
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/aws/awsDstMap','3','2');" id="#">Contour Map</a></li>
+                        
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/aws/awsWindRose','3','4');" id="#">Wind Rose</a></li>
+                        
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/aws/awsTime','3','3');" id="#">Time Series</a></li>
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/aws/awsPrcptDay','3','5');" id="#">Precipitation - Day</a></li>
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/aws/awsPrcptDaily','3','6');" id="#">Precipitation - Daily</a></li>
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/aws/awsPrcptWeekly','3','7');" id="#">Precipitation - Weekly</a></li>
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/aws/awsPrcptMonthly','3','8');" id="#">Precipitation - Monthly</a></li>
+                        
+
+                    </ul>
+                </li>
+
+                
+                <li class="mm-active">
+                    
+                    
+                    <a href="javascript: void(0);" class="has-arrow" aria-expanded="false">
+                        <i class="nav-icon fas fa-clipboard-list"></i>
+                        <span class="menu-item" id="Reports">Reports</span>
+                    </a>
+                    <ul class="sub-menu" aria-expanded="false">
+                        
+                            <li class="mm-active"><a href="javascript:fn_goPage2('/rprt/weatherMinute','4','1');" id="#" data-key="t-inbox" class="active">Collection Data by Time Slot</a></li>
+                        
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/rprt/weatherDays','4','2');">Statistics Report - Daily</a></li>
+                        
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/rprt/weatherMonths','4','3');" id="#">Statistics Report - Monthly</a></li>
+                        
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/rprt/weatherYears','4','4');" id="#">Statistics Report - Yearly</a></li>
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/rprt/windSpeedMonth','4','5');" id="#">Wind Speed Freq. - Daily</a></li>
+                        
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/rprt/windSpeedYear','4','6');" id="#">Wind Speed Freq. - Monthly</a></li>
+                        
+
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/rprt/windDirMonth','4','7');" id="#">Wind Dir. Freq. - Daily</a></li>
+                        
+                        
+                        
+                            <li><a href="javascript:fn_goPage2('/rprt/windDirYear','4','8');" id="#">Wind Dir. Freq. - Monthly</a></li>
+                        
+                    </ul>
+                </li>
+    
+        
+        
+            <li >
+                <a href="http://113.53.235.7:8080/thunderstorm" target="_blank">
+                    <i class="nav-icon fa fa-bullseye"></i>
+                    <span class="menu-item">Thunderstorm tracking</span>
+                </a>
+            </li>
+            <li >
+                <a href="http://122.155.135.49" target="_blank">
+                    <i class="nav-icon fa fa-cloud"></i>
+                    <span class="menu-item">AWS & NWP Data Display</span>
+                </a>
+	    </li>
+	    <li >
+		<a href="http://122.155.135.51" target="_blank">
+	            <i class="nav-icon fa fa-umbrella"></i>
+		    <span class="menu-item">AWS 39 Station</span>
+		</a>
+            </li>
+        </ul>
+        </div>
+        <!-- Sidebar -->
+    </div>
+</div>
+<!-- Left Sidebar End -->
+
+					<div class="main-content">
+			<!-- container -->
+	            
+					
+
+
+
+
+
+
+<script>
+ $(document).ready(function() {
+	var dt = N_DT.substring(0,10);
+	var si = N_DT.substring(11,13);
+	var mi = N_DT.substring(14,16);
+	//dt = dt.replace(/\//g, "/");
+	$("#indate").val(dt);
+
+	M_REGION = '1';
+	M_STATION = '37';
+
+	if(M_REGION)	fn_subCity($("#weatherMinuteFrm"), M_REGION);
+	else			fn_subCity($("#weatherMinuteFrm"), C_REGION);
+
+	$("#rows").val(500);
+	timewidth_list();
+	list_hour00('shr','00');
+	list_minute('smin','01','1');
+	//list_hour00('fhr',$.trim(si));
+	//list_minute('fmin',mi,'1')
+	list_hour00('fhr', '24');
+	list_minute('fmin','00','1')
+	
+	BG = -1;
+	var cellclassname = function (row, columnfield, value, data) {
+        if (value ==  'Minimum' || value ==  'Time' || value == 'Average' || value == 'Maximum') {
+        	if(columnfield == 'sectime')	BG = 0;
+        }
+		else	{
+        	if(columnfield == 'sectime')	BG = -1;
+        }
+ 
+		if(BG==0)	return 'green';
+    } 
+	
+	source = {
+		datatype: "json",
+		datafields: [
+			{ name: 'sectime', type: 'string' },
+			{ name: 's00a'	, type: 'string' },
+			{ name: 's00m'	, type: 'string' },
+			{ name: 's01a'	, type: 'string' },
+			{ name: 's01m'	, type: 'string' },
+			{ name: 's02a'	, type: 'string' },
+			{ name: 's02a_hi'	, type: 'string' },
+			{ name: 's03m'	, type: 'string' },
+			{ name: 'r01m'	, type: 'string' },
+			{ name: 's04a'	, type: 'string' },
+			{ name: 's05a'	, type: 'string' },
+			{ name: 's06m'	, type: 'string' },
+			{ name: 's07a'	, type: 'string' },
+			{ name: 's04a_qff'	, type: 'string' },
+		]            
+	};
+
+	column = [
+		{ text: 'Time', pinned:true, datafield: 'sectime', 	width: '100px', align: "center", cellsalign: "right", cellclassname:cellclassname, pinned:true},
+	
+		{ text: 'Wind Dir', columngroup:'Wind',   cellclassname:cellclassname,	datafield: 's00a'	, 	width: '70px', align: "center", cellsalign: "right"
+			,renderer: function () {
+	            return '<div style="margin-top:4px;text-align:center">Wind<br/>Dir<br/>(deg)</div>';
+	        }
+		},
+		{ text: 'Wind Speed', columngroup:'Wind',  cellclassname:cellclassname,	datafield: 's01a'	, 	width: '100px', align: "center", cellsalign: "right"
+			,renderer: function () {
+	            return '<div style="margin-top:4px;text-align:center">Wind<br/>Speed<br/>(knot)</div>';
+	        }	
+		},
+		{ text: 'Max Wind Dir', 	columngroup:'Max Wind',    cellclassname:cellclassname,	datafield: 's00m'	, 	width: '80px', align: "center", cellsalign: "right"
+			,renderer: function () {
+	            return '<div style="margin-top:4px;text-align:center">Max Wind<br/>Dir<br/>(deg)</div>';
+	        }	
+		},
+		{ text: 'Max Wind Speed', columngroup:'Max Wind',    cellclassname:cellclassname,	datafield: 's01m'	, 	width: '100px', align: "center", cellsalign: "right"
+			,renderer: function () {
+	            return '<div style="margin-top:4px;text-align:center">Max Wind<br/>Speed<br/>(knot)</div>';
+	        }	
+		},
+	  	{ text: 'Temp.', cellclassname:cellclassname,		datafield: 's02a'	, 	width: '100px', align: "center", cellsalign: "right"
+	  		,renderer: function () {
+	            return '<div style="margin-top:10px;text-align:center">Temp.<br/>(°C)</div>';
+	        }
+	  	},
+	  	{ text: 'Humi.', 			datafield: 's05a'	, 	cellclassname:cellclassname,	width: '100px', align: "center", cellsalign: "right"
+	  		,renderer: function () {
+	            return '<div style="margin-top:10px;text-align:center">Humi.<br/>(%)</div>';
+	        }
+	  	},
+	  	{ text: 'HeatIndex', cellclassname:cellclassname,		datafield: 's02a_hi'	, 	width: '100px', align: "center", cellsalign: "right"
+	  		,renderer: function () {
+	            return '<div style="margin-top:10px;text-align:center">HeatIndex<br/>(°C)</div>';
+	        }
+	  	},
+		{ text: 'Pres.', 		datafield: 's04a'	, cellclassname:cellclassname,		width: '100px', align: "center", cellsalign: "right"
+			,renderer: function () {
+	            return '<div style="margin-top:10px;text-align:center">Pres.<br/>(hPa)</div>';
+	        }
+		},
+        { text: 'QFF.', 		datafield: 's04a_qff'	, cellclassname:cellclassname,		width: '100px', align: "center", cellsalign: "right"
+            ,renderer: function () {
+                return '<div style="margin-top:10px;text-align:center">QFF.<br/>(hPa)</div>';
+            }
+        },
+		{ text: 'Prec.', 		datafield: 'r01m'	, cellclassname:cellclassname,		width: '70px', align: "center", cellsalign: "right"
+	  		,renderer: function () {
+	            return '<div style="margin-top:10px;text-align:center">Prec.<br/>(mm)</div>';
+	        }
+	  	},
+	  	{ text: 'Vis.', 		datafield: 's07a'	, cellclassname:cellclassname,		width: '80px', align: "center", cellsalign: "right"
+	  		,renderer: function () {
+	            return '<div style="margin-top:10px;text-align:center">Vis.<br/>(m)</div>';
+	        }
+	  	},
+	  	{ text: 'Weather.', 			datafield: 's06m'	, cellclassname:cellclassname,		width: '90px', align: "center", cellsalign: "right"
+	  		,renderer: function () {
+	            return '<div style="margin-top:10px;text-align:center">Weather.<br/>(code)</div>';
+	        }
+	  	},
+	];
+  
+	//columngroup = [
+	//	{ text: 'Time'		 	, align: 'center', name:'Time'	  	},
+	//    { text: 'Wind'		 	, align: 'center', name:'Wind'	  	},
+	//    { text: 'Max Wind'		, align: 'center', name:'Max Wind'	},
+	//];
+
+	$('#jqxGrid').commGrid(source, column, false);
+	$('#jqxGrid').jqxGrid({width: "100%",sortable:false });
+	$('#jqxGrid').jqxGrid({columnsheight: "55"});
+	//$('#jqxGrid').jqxGrid({columngroups:  columngroup});
+	$('#jqxGrid').jqxGrid('autoresizecolumns');
+
+	$("#excel").click(function() {	$("#jqxGrid").jqxGrid('exportview', 'xlsx', 'TimeSlot_'+$("#station option:selected").text());	});
+	$("#csv").click(function() {	$("#jqxGrid").jqxGrid('exportview', 'csv', 'TimeSlot_'+$("#station option:selected").text());		});
+
+	fn_reports();
+});
+
+function fn_reports(){
+	$('#jqxLoader').jqxLoader('open');
+    BG = -1;
+	var s = $("#indate").val();
+	s = s.replace(/\//g,"");
+	/* if($("#station").val() == false || $("#station").val() == ''){
+		//$("#station").attr("disabled", false); //??
+		$("#station").val('21');
+	} */
+
+	var sh;
+    var fh;
+
+	var sm;
+    var fm;
+
+/*
+	if($("#step").val() == '6000' || $("#step").val() == '18000') {
+		if($("#shr").val()=='00')	{
+			document.getElementById("shr").selectedIndex = "1";
+		}
+		if($("#fhr").val()=='00')	{
+			document.getElementById("fhr").selectedIndex = "1";
+		}
+
+		sm = '00';
+    	fm = '00';
+    }
+	else	{
+		if($("#shr").val()=='00')	{
+			if($("#smin").val()=='00')	{
+				document.getElementById("smin").selectedIndex = "1";
+			}
+		}
+		else if($("#shr").val()=='24')	{
+			if($("#smin").val()!='00')	{
+				$("#smin").val('00');
+			}
+		}
+
+		if($("#fhr").val()=='00')	{
+			if($("#fmin").val()=='00')	{
+				document.getElementById("fmin").selectedIndex = "1";
+			}
+		}
+		else if($("#fhr").val()=='24')	{
+			if($("#fmin").val()!='00')	{
+				$("#fmin").val('00');
+			}
+		}
+		sm = $("#smin").val();
+    	fm = $("#fmin").val();
+	}
+*/
+	sh = $("#shr").val();
+    fh = $("#fhr").val();
+	sm = $("#smin").val();
+    	fm = $("#fmin").val();
+
+
+	$("#sdate").val(s + $("#shr").val() + sm + '00');
+	$("#fdate").val(s + $("#fhr").val() + fm + '00');
+
+    if($("#sdate").val().match("000000")){
+        SECTIME00 = $("#sdate").val();
+        var inyear    = $("#sdate").val().substring( 0, 4);
+        var inmonth   = $("#sdate").val().substring( 4, 6);
+        var inday     = $("#sdate").val().substring( 6,8);
+
+        inyear  = parseInt(inyear);
+        inmonth = parseInt(inmonth) -1;
+        inday   = parseInt(inday) -1;
+
+        var thesdate = new Date(inyear, inmonth, inday, 0, 1, 0, 0 );
+
+        var YY = thesdate.getFullYear();
+        var MM = sprintf("%02d", parseInt(thesdate.getMonth())+1);
+        var DD = sprintf("%02d", parseInt(thesdate.getDate ())  );
+        $("#sdate").val(YY+''+MM+''+DD+'240000');
+        SECTIME24 = $("#sdate").val();
+    }
+
+	var jData = $("#weatherMinuteFrm").serialize();
+	$("#weatherMinuteFrm").attr("method", "POST");
+	$("#weatherMinuteFrm").attr("action", "/rprt/weatherMinuteData;jsessionid=0279AF6F9309747C551B165A92189530");
+	fn_submitAjax($("#weatherMinuteFrm"), jData, fn_reportsCallBack, 'json');
+}
+
+function fn_reportsCallBack(result)	{
+	//console.log(result);
+	if(result.resultCode == "200")	{
+		var vData = result.data;
+		var listData = vData.list;
+		source.localdata = listData;
+
+		//console.log(vData);
+
+		fnTitle(result);
+		if(typeof $("#jqxGrid").jqxGrid("source") == "undefined") {
+			$('#jqxGrid').commGrid(source, column, false);
+		} 
+		else	{
+            $("#jqxGrid").jqxGrid("clearselection");
+			var dataAdapter = new $.jqx.dataAdapter(source, {
+				beforeLoadComplete: function (records){
+					var data = [];
+
+					var stat_data = {
+						s00a 	 : { a: -9999.,	n: -9999., m: -9999., cnt: 0, n_dt: '',	m_dt: '' },
+						s00m     : { a: -9999.,	n: -9999., m: -9999., cnt: 0, n_dt: '',	m_dt: '' },
+						s01a     : { a: -9999.,	n: -9999., m: -9999., cnt: 0, n_dt: '',	m_dt: '' },
+						s01m     : { a: -9999.,	n: -9999., m: -9999., cnt: 0, n_dt: '',	m_dt: '' },
+						s02a     : { a: -9999.,	n: -9999., m: -9999., cnt: 0, n_dt: '',	m_dt: '' },
+						s02a_hi  : { a: -9999.,	n: -9999., m: -9999., cnt: 0, n_dt: '',	m_dt: '' },
+						s03m     : { a: -9999.,	n: -9999., m: -9999., cnt: 0, n_dt: '',	m_dt: '' },
+						r01m     : { a: -9999.,	n: -9999., m: -9999., cnt: 0, n_dt: '',	m_dt: '' },
+						s04a     : { a: -9999.,	n: -9999., m: -9999., cnt: 0, n_dt: '',	m_dt: '' },
+						s04a_qff : { a: -9999.,	n: -9999., m: -9999., cnt: 0, n_dt: '',	m_dt: '' },
+						s05a     : { a: -9999.,	n: -9999., m: -9999., cnt: 0, n_dt: '',	m_dt: '' },
+						s07a     : { a: -9999.,	n: -9999., m: -9999., cnt: 0, n_dt: '',	m_dt: '' }
+					};
+
+					var RecCount = records.length;
+					
+					for(var i=0; i<RecCount; i++)	{
+						var obj = records[i];
+                        var sec = listData[i].sectime;
+
+                        //if(sec === SECTIME24)	sec = SECTIME00;
+
+						var wd, ws, temp, humi, pres, prec, vis, wth;
+
+						obj.sectime = change_str14(sec,"yymmddhhmi");
+
+						// Wind
+						obj.s01a = '';
+						obj.s00a = '';
+						wd = listData[i].s00a;	
+						ws = listData[i].s01a;	
+						if(wd!=null && ws!=null)	{
+							wd = parseFloat(wd);  
+							ws = parseFloat(ws);  
+
+							//if(ws<=0.)	wd = -9999.;
+
+							obj.s01a = format_nums(roundXL(msToknot(ws), 1), 1);
+							obj.s00a = format_nums(roundXL(wd, 1), 0);
+
+							if(ws!=-9999. && wd!=-9999.)	{
+								if(stat_data.s01a.cnt==0)	{
+									stat_data.s01a.a = ws;
+									stat_data.s00a.a = deg2rad(wd);
+
+									stat_data.s00a.n = wd;	stat_data.s00a.n_dt = obj.sectime;
+									stat_data.s01a.n = ws;	stat_data.s01a.m_dt = obj.sectime;
+
+									stat_data.s00a.m = wd;	stat_data.s00a.m_dt = obj.sectime;
+									stat_data.s01a.m = ws;	stat_data.s01a.m_dt = obj.sectime;
+								}
+								else {
+									stat_data.s01a.a += ws;
+									stat_data.s00a.a += deg2rad(wd);
+
+									if(stat_data.s01a.n>ws)	{
+										stat_data.s00a.n = wd;	stat_data.s00a.n_dt = obj.sectime;
+										stat_data.s01a.n = ws;	stat_data.s01a.n_dt = obj.sectime;
+									}
+									if(stat_data.s01a.m<ws)	{
+										stat_data.s00a.m = wd;	stat_data.s00a.m_dt = obj.sectime;
+										stat_data.s01a.m = ws;	stat_data.s01a.m_dt = obj.sectime;
+									}
+								}
+								stat_data.s00a.cnt += 1;
+								stat_data.s01a.cnt += 1;
+							}
+						}
+
+						// Max Wind
+						obj.s01m = '';
+						obj.s00m = '';
+						wd = listData[i].s00m;	
+						ws = listData[i].s01m;	
+						if(wd!=null && ws!=null)	{
+							wd = parseFloat(wd);  
+							ws = parseFloat(ws);  
+
+							//if(ws<=0.)	wd = -9999.;
+
+							obj.s01m = format_nums(roundXL(msToknot(ws), 1), 1);
+							obj.s00m = format_nums(roundXL(wd, 1), 0);
+
+							if(ws!=-9999. && wd!=-9999.)	{
+								if(stat_data.s01m.cnt==0)	{
+									stat_data.s01m.a = ws;
+									stat_data.s00m.a = deg2rad(wd);
+
+									stat_data.s00m.n = wd;	stat_data.s00m.n_dt = obj.sectime;
+									stat_data.s01m.n = ws;	stat_data.s01m.n_dt = obj.sectime;
+
+									stat_data.s00m.m = wd;	stat_data.s00m.m_dt = obj.sectime;
+									stat_data.s01m.m = ws;	stat_data.s01m.m_dt = obj.sectime;
+								}
+								else {
+									stat_data.s01m.a += ws;
+									stat_data.s00m.a += deg2rad(wd);
+
+									if(stat_data.s01m.n>ws)	{
+										stat_data.s00m.n = wd;	stat_data.s00m.n_dt = obj.sectime;
+										stat_data.s01m.n = ws;	stat_data.s01m.n_dt = obj.sectime;
+									}
+									if(stat_data.s01m.m<ws)	{
+										stat_data.s00m.m = wd;	stat_data.s00m.m_dt = obj.sectime;
+										stat_data.s01m.m = ws;	stat_data.s01m.m_dt = obj.sectime;
+									}
+								}
+								stat_data.s00m.cnt += 1;
+								stat_data.s01m.cnt += 1;
+							}
+						}
+
+						// Temp.
+						obj.s02a = '';
+						temp = listData[i].s02a;
+						if(temp!=null)	{
+							temp = parseFloat(temp);  
+
+							obj.s02a = format_nums(roundXL(temp, 1), 1);
+
+							if(temp!=-9999.)	{
+								if(stat_data.s02a.cnt==0)	{
+									stat_data.s02a.a = temp;
+
+									stat_data.s02a.n = temp;	stat_data.s02a.n_dt = obj.sectime;
+									stat_data.s02a.m = temp;	stat_data.s02a.m_dt = obj.sectime;
+								}
+								else	{
+									stat_data.s02a.a += temp;
+
+									if(stat_data.s02a.n>temp)	{
+										stat_data.s02a.n = temp;	stat_data.s02a.n_dt = obj.sectime;
+									}
+									if(stat_data.s02a.m<temp)	{
+										stat_data.s02a.m = temp;	stat_data.s02a.m_dt = obj.sectime;
+									}
+								}
+								stat_data.s02a.cnt += 1;
+							}
+						}
+
+						// Prec.
+						obj.r01m = '';
+						prec = listData[i].r01m;
+						if(prec!=null)	{
+							prec = parseFloat(prec);  
+
+							obj.r01m = format_nums(roundXL(prec, 1), 1);
+							if(prec!=-9999.)	{
+								if(stat_data.r01m.m < 0.)	stat_data.r01m.m  = prec;
+								else						stat_data.r01m.m += prec;
+							}
+						}
+
+						// Pres.
+						obj.s04a = '';
+						pres = listData[i].s04a;
+						if(pres!=null)	{
+							pres = parseFloat(pres);  
+							obj.s04a = format_nums(roundXL(pres, 1), 1);
+
+							if(pres!=-9999.)	{
+								if(temp!=null && temp!=-9999.)	{
+									obj.s04a_qff = format_nums(qff(pres, temp, vData.object.alt),1);
+								}		
+
+								if(stat_data.s04a.cnt==0)	{
+									stat_data.s04a.a = pres;
+
+									stat_data.s04a.n = pres;	stat_data.s04a.n_dt = obj.sectime;
+									stat_data.s04a.m = pres;	stat_data.s04a.m_dt = obj.sectime;
+
+									if(temp!=null && temp!=-9999.)	{
+										stat_data.s04a_qff.n = qff(pres, temp, vData.object.alt);
+										stat_data.s04a_qff.m = qff(pres, temp, vData.object.alt);
+									}
+								}
+								else	{
+									stat_data.s04a.a += pres;
+
+									if(stat_data.s04a.n>pres)	{
+										stat_data.s04a.n = pres;	stat_data.s04a.n_dt = obj.sectime;
+										if(temp!=null && temp!=-9999.)	{
+											stat_data.s04a_qff.n = qff(pres, temp, vData.object.alt);
+										}
+									}
+									if(stat_data.s04a.m<pres)	{
+										stat_data.s04a.m = pres;	stat_data.s04a.m_dt = obj.sectime;
+										if(temp!=null && temp!=-9999.)	{
+											stat_data.s04a_qff.m = qff(pres, temp, vData.object.alt);
+										}
+									}
+								}
+								stat_data.s04a.cnt += 1;
+							}
+						}
+
+						// Humi.
+						obj.s05a = '';
+						humi = listData[i].s05a;
+						if(humi!=null)	{
+							humi = parseFloat(humi);  
+							obj.s05a = format_nums(roundXL(humi, 1), 1);
+
+							if(humi!=-9999.)	{
+								if(stat_data.s05a.cnt==0)	{
+									stat_data.s05a.a = humi;
+
+									stat_data.s05a.n = humi;	stat_data.s05a.n_dt = obj.sectime;
+									stat_data.s05a.m = humi;	stat_data.s05a.m_dt = obj.sectime;
+								}
+								else	{
+									stat_data.s05a.a += humi;
+
+									if(stat_data.s05a.n>humi)	{
+										stat_data.s05a.n = humi;	stat_data.s05a.n_dt = obj.sectime;
+									}
+									if(stat_data.s05a.m<humi)	{
+										stat_data.s05a.m = humi;	stat_data.s05a.m_dt = obj.sectime;
+									}
+								}
+								stat_data.s05a.cnt += 1;
+							}
+						}
+
+						// Heat Index
+						temp = listData[i].s02a;
+						humi = listData[i].s05a;
+						obj.s02a_hi = '';
+						if(temp!=null && humi!=null)	{
+							temp = parseFloat(temp);  
+							humi = parseFloat(humi);  
+
+							var hi = -9999.;
+
+							if(temp!=-9999. && humi!=-9999.)	hi = HeatIndex(temp, humi);
+
+							obj.s02a_hi = format_nums(roundXL(hi, 1), 1);
+
+							if(hi!=-9999.)	{
+								if(stat_data.s02a_hi.cnt==0)	{
+									stat_data.s02a_hi.a = hi;
+
+									stat_data.s02a_hi.n = hi;	stat_data.s02a_hi.n_dt = obj.sectime;
+									stat_data.s02a_hi.m = hi;	stat_data.s02a_hi.m_dt = obj.sectime;
+								}
+								else	{
+									stat_data.s02a_hi.a += hi;
+
+									if(stat_data.s02a_hi.n>hi)	{
+										stat_data.s02a_hi.n = hi;	stat_data.s02a_hi.n_dt = obj.sectime;
+									}
+									if(stat_data.s02a_hi.m<hi)	{
+										stat_data.s02a_hi.m = hi;	stat_data.s02a_hi.m_dt = obj.sectime;
+									}
+								}
+								stat_data.s02a_hi.cnt += 1;
+							}
+						}
+
+						if(vData.object.wvSensor === 'y'){
+							// Vis.
+							obj.s07a = '';
+							vis = listData[i].s07a;
+							if(vis!=null)	{
+								vis = parseFloat(vis);  
+								obj.s07a = format_nums(roundXL(vis, 0), 0);
+
+								if(vis!=-9999.)	{
+									if(stat_data.s07a.cnt==0)	{
+										stat_data.s07a.a = vis;
+
+										stat_data.s07a.n = vis;	stat_data.s07a.n_dt = obj.sectime;
+										stat_data.s07a.m = vis;	stat_data.s07a.m_dt = obj.sectime;
+									}
+									else	{
+										stat_data.s07a.a += vis;
+
+										if(stat_data.s07a.n>vis)	{
+											stat_data.s07a.n = vis;	stat_data.s07a.n_dt = obj.sectime;
+										}
+										if(stat_data.s07a.m<vis)	{
+											stat_data.s07a.m = vis;	stat_data.s07a.m_dt = obj.sectime;
+										}
+									}
+									stat_data.s07a.cnt += 1;
+								}
+							}
+
+							// weather
+							obj.s06m = '';
+							wth = listData[i].s06m;
+							if(wth!=null)	{
+								wth = parseFloat(wth);  
+								obj.s06m = Fc_weather2(wth);
+							}
+						}
+						else	{
+							obj.s07a = '';
+							obj.s06m = ''
+						}
+
+						data.push(obj);
+					}
+
+					// Stat
+					if(stat_data.s00a.cnt > 0)	stat_data.s00a.a = rad2deg(stat_data.s00a.a/stat_data.s00a.cnt);
+					if(stat_data.s01a.cnt > 0)	stat_data.s01a.a = stat_data.s01a.a/stat_data.s01a.cnt;
+
+					if(stat_data.s00m.cnt > 0)	stat_data.s00m.a = rad2deg(stat_data.s00m.a/stat_data.s00m.cnt);
+					if(stat_data.s01m.cnt > 0)	stat_data.s01m.a = stat_data.s01m.a/stat_data.s01m.cnt;
+
+					if(stat_data.s02a.cnt > 0)	stat_data.s02a.a = stat_data.s02a.a/stat_data.s02a.cnt;
+
+					if(stat_data.s04a.cnt > 0)	{
+						stat_data.s04a.a = stat_data.s04a.a/stat_data.s04a.cnt;
+
+						if(stat_data.s02a.a!=-9999.)	{
+							stat_data.s04a_qff.a = qff(stat_data.s04a.a, stat_data.s02a.a, vData.object.alt);
+						}
+					}
+
+					if(stat_data.s05a.cnt > 0)	stat_data.s05a.a = stat_data.s05a.a/stat_data.s05a.cnt;
+
+					if(stat_data.s07a.cnt > 0)	stat_data.s07a.a = stat_data.s07a.a/stat_data.s07a.cnt;
+
+					if(stat_data.s02a_hi.cnt > 0)	{
+						stat_data.s02a_hi.a = HeatIndex(stat_data.s02a.a, stat_data.s05a.a);
+					}	
+
+					// Avg
+					var stat_avg = [];
+					stat_avg.sectime = 'Average';
+					if(stat_data.s01a.a>0.)	stat_avg.s00a = format_nums(stat_data.s00a.a, 0);
+					else					stat_avg.s00a = '-'; 
+					stat_avg.s01a = format_nums(msToknot(stat_data.s01a.a), 1);
+
+					if(stat_data.s01m.a>0.)	stat_avg.s00m = format_nums(stat_data.s00m.a, 0);
+					else					stat_avg.s00m = '-';
+					stat_avg.s01m = format_nums(msToknot(stat_data.s01m.a), 1);
+
+					stat_avg.s02a = format_nums(stat_data.s02a.a, 1);
+					stat_avg.s02a_hi = format_nums(stat_data.s02a_hi.a, 1);
+
+					stat_avg.s03m = '';
+					stat_avg.s04a = format_nums(stat_data.s04a.a, 1);
+					stat_avg.s04a_qff = format_nums(stat_data.s04a_qff.a, 1);
+					stat_avg.s05a = format_nums(stat_data.s05a.a, 1);
+					stat_avg.s07a = format_nums(stat_data.s07a.a, 0);
+					stat_avg.s06m = '';
+					data.push(stat_avg);
+
+					// Min
+					var stat_min = [];
+					var stat_min_time = [];
+					stat_min.sectime = 'Minimum';
+					//if(stat_data.s01a.n>0.)	stat_min.s00a = format_nums(stat_data.s00a.n, 0);
+					//else						stat_min.s00a = '-';
+					//stat_min.s01a = format_nums(msToknot(stat_data.s01a.n), 1);
+
+					//if(stat_data.s01m.n>0.)	stat_min.s00m = format_nums(stat_data.s00m.n, 0);
+					//else						stat_min.s00m = '-';
+					//stat_min.s01m = format_nums(msToknot(stat_data.s01m.n), 1);
+
+					stat_min.s02a = format_nums(stat_data.s02a.n, 1);
+					stat_min.s02a_hi = format_nums(stat_data.s02a_hi.n, 1);
+
+					stat_min.s03m = '';
+					stat_min.s04a = format_nums(stat_data.s04a.n, 1);
+					stat_min.s04a_qff = format_nums(stat_data.s04a_qff.n, 1);
+					stat_min.s05a = format_nums(stat_data.s05a.n, 1);
+					stat_min.s07a = format_nums(stat_data.s07a.n, 0);
+					stat_min.s06m = '';
+					data.push(stat_min);
+
+					stat_min_time.sectime = 'Time';
+					//stat_min_time.s00a = '';
+					//stat_min_time.s01a = stat_data.s01a.n_dt;
+					//stat_min_time.s00m = '';
+					//stat_min_time.s01m = stat_data.s01m.n_dt;
+					stat_min_time.s02a = stat_data.s02a.n_dt;
+					stat_min_time.s02a_hi = stat_data.s02a_hi.n_dt;
+					stat_min_time.s03m = '';
+					stat_min_time.s04a = stat_data.s04a.n_dt;
+					stat_min_time.s05a = stat_data.s05a.n_dt;
+					stat_min_time.s07a = stat_data.s07a.n_dt;
+					stat_min_time.s06m = '';
+					data.push(stat_min_time);
+
+					// Max
+					var stat_max = [];
+					var stat_max_time = [];
+					stat_max.sectime = 'Maximum';
+					if(stat_data.s01a.m>0.)	stat_max.s00a = format_nums(stat_data.s00a.m, 0);
+					else					stat_max.s00a = '-';
+					stat_max.s01a = format_nums(msToknot(stat_data.s01a.m), 1);
+
+					if(stat_data.s01m.m>0.)	stat_max.s00m = format_nums(stat_data.s00m.m, 0);
+					else					stat_max.s00m = '-';
+					stat_max.s01m = format_nums(msToknot(stat_data.s01m.m), 1);
+
+					stat_max.s02a = format_nums(stat_data.s02a.m, 1);
+					stat_max.s02a_hi = format_nums(stat_data.s02a_hi.m, 1);
+					stat_max.r01m = format_nums(stat_data.r01m.m, 1);
+					stat_max.s04a = format_nums(stat_data.s04a.m, 1);
+					stat_max.s04a_qff = format_nums(stat_data.s04a_qff.m, 1);
+					stat_max.s05a = format_nums(stat_data.s05a.m, 1);
+					stat_max.s07a = format_nums(stat_data.s07a.m, 0);
+					stat_max.s06m = '';
+					data.push(stat_max);
+
+					stat_max_time.sectime = 'Time';
+					stat_max_time.s00a = '';
+					stat_max_time.s01a = stat_data.s01a.m_dt;
+					stat_max_time.s00m = '';
+					stat_max_time.s01m = stat_data.s01m.m_dt;
+					stat_max_time.s02a = stat_data.s02a.m_dt;
+					stat_max_time.s02a_hi = stat_data.s02a_hi.m_dt;
+					stat_max_time.s03m = '';
+					stat_max_time.s04a = stat_data.s04a.m_dt;
+					stat_max_time.s05a = stat_data.s05a.m_dt;
+					stat_max_time.s07a = stat_data.s07a.m_dt;
+					stat_max_time.s06m = '';
+					data.push(stat_max_time);
+
+                    return data;
+                }
+			});
+			
+			$("#jqxGrid").jqxGrid("source", dataAdapter);
+			//$('#jqxGrid').jqxGrid('sortby', 'sectime', 'asc');
+		}
+		
+		//var siteInfo = vData.object;
+		//var siteLat = siteInfo.lat;
+		
+		if(vData.list.length > 0 && vData.list != null){
+		}
+		
+	}
+	$('#jqxLoader').jqxLoader('close');
+	
+}
+
+function timewidth_list(val){
+	var html = "";
+	html = html + "<option value='100'";		if(val == "100"  ){ html = html + " selected "; }	html = html + ">1min</option>";
+	html = html + "<option value='500'";		if(val == "500"  ){ html = html + " selected "; }	html = html + ">5min</option>";
+	html = html + "<option value='1000'";		if(val == "1000"  ){ html = html + " selected "; }	html = html + ">10min</option>";
+	html = html + "<option value='1500'";		if(val == "1500"  ){ html = html + " selected "; }	html = html + ">15min</option>";
+	html = html + "<option value='3000'";		if(val == "3000" ){ html = html + " selected "; }	html = html + ">30min</option>";
+	html = html + "<option value='6000'";		if(val == "6000" ){ html = html + " selected "; }	html = html + ">1hr</option>";
+	html = html + "<option value='18000'";		if(val == "18000" ){ html = html + " selected "; }	html = html + ">3hr</option>";
+	
+	$("select[name='step']").append(html);
+}
+
+function sub_minute(val, obj){
+	return;
+
+	$("#shr").empty();
+	$("#fhr").empty();
+	$("#smin").empty();
+	$("#fmin").empty();
+
+	if(val == "")	{
+	}
+	else	{
+		if(val == "100")	{
+			list_hour00('shr','00','1');
+			list_hour00('fhr','24','1');
+			list_minute('smin','01','1');
+			list_minute('fmin','00','1');
+		}
+		else if(val == "500")	{
+			list_hour00('shr','00','1');
+			list_hour00('fhr','24','1');
+			list_minute('smin','05','5');
+			list_minute('fmin','00','5');
+		}
+		else if(val == "1000")	{
+			list_hour00('shr','00','1');
+			list_hour00('fhr','24','1');
+			list_minute('smin','10','10');
+			list_minute('fmin','00','10');
+		}
+		else if(val == "1500")	{
+			list_hour00('shr','00','1');
+			list_hour00('fhr','24','1');
+			list_minute('smin','15','15');
+			list_minute('fmin','00','15');
+		}
+		else if(val == "3000")	{
+			list_hour00('shr','00','1');
+			list_hour00('fhr','24','1');
+			list_minute('smin','30','30');
+			list_minute('fmin','00','30');
+		}
+		else if(val == "6000")	{
+			list_hour00('shr','01','1');
+			list_hour00('fhr','24','1');
+		}
+		else if(val == "18000")	{
+			list_hour00('shr','03','3');
+			list_hour00('fhr','24','3');
+		}
+	}
+}
+
+function fnTitle(result){
+	var vData = result.data;
+	
+	var html = "";
+	var tHtml = "";
+	var title = "";
+	$("#wthrMinTitle").empty();
+	$("#wthrMinSubTitle").empty();
+
+    //vData.object.awsid + "." + vData.object.sname
+	$("#wthrMinTitle").append($("#station option:selected").text());
+	//$("#wthrMinSubTitle").append("UTC : "+$("#indate").val()+" "+$("#shr").val()+":"+$("#smin").val()+" ~ "+$("#fhr").val()+":"+$("#fmin").val()+" / Interval : "+$("#step option:selected").text());
+    $("#wthrMinSubTitle").append("" + N_DT)
+}
+</script>
+
+<div class="page-content pb-0">
+	<div class="container-fluid">
+		<!-- start page title -->
+		<div class="row">
+			<div class="col-12">
+				<div class="page-title-box d-flex align-items-center justify-content-between">
+					<h4 class="mb-0">Collection Data by Time Slot</h4>
+					<div class="page-title-right">
+						<ol class="breadcrumb m-0">
+							<li class="breadcrumb-item"><a href="javascript: void(0);">Home</a></li>
+							<li class="breadcrumb-item">Reports</li>
+							<li class="breadcrumb-item active">Collection Data by Time Slot</li>
+						</ol>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- end page title -->
+		<form name="weatherMinuteFrm"  id="weatherMinuteFrm">
+			<input type="hidden" name="listwidth" value="740">
+			<input type="hidden" name="syear">
+			<input type="hidden" name="smonth">
+			<input type="hidden" name="sday">
+			<input type="hidden" name="fdate" id="fdate">
+			<input type="hidden" name="sdate" id="sdate">
+			<input type="hidden" name="fyear">
+			<input type="hidden" name="fmonth">
+			<input type="hidden" name="fday">
+			<input type="hidden" name="gmt" value="y">
+			<input type="hidden" name="rows" id="rows" value="">
+			<!-- start row1 -->
+			<div class="card">
+				<div class="card-body bg-soft-primary">
+					<div class="d-flex flex-wrap gap-2" style="padding-bottom:6px;">
+						<div class="col-md-2 align-self-end">
+							<label for="#" class="form-label">Region</label>
+							<select name="regions" id="regions" class="form-select" onchange="fn_subCity($('#weatherMinuteFrm'),this.value);">
+								
+									<option value="1">Central</option>
+								
+									<option value="2">Eastern</option>
+								
+									<option value="3">Northern</option>
+								
+									<option value="4">North Eastern</option>
+								
+									<option value="5">Southern Eastern</option>
+								
+									<option value="6">Southern Western</option>
+								
+							</select>
+						</div>
+						<div class="col-md-3 align-self-end">
+							<label for="#" class="form-label">Station</label>
+							<select name="station" id="station" class="form-select" DISABLED>
+								<option value=''>Select Regions</option>
+							</select>
+						</div>
+						<div class="col-1 align-self-end">
+							<label for="#" class="form-label">Interval</label>
+							<select name="step" id="step" class="form-select" onchange="sub_minute(this.value,'searchform')">
+						</select>
+						</div>
+					</div>
+					<div class="d-flex flex-wrap gap-2">
+						<div class="col-2 align-self-end">
+							<label for="#" class="form-label">Date</label>
+							<input type="text" name="indate" id="indate" class="form-control" value="" readOnly />
+						</div>
+						
+						<div class="col-1 align-self-end">
+						<label for="#" class="form-label">Hr</label>
+							<select name="shr" id="shr" class="form-select"></select>
+						</div>
+						<div class="col-1 align-self-end">
+							<label for="#" class="form-label">Min</label>
+						<select name="smin" id="smin" class="form-select" ></select>
+						</div>
+						<div class="col-auto align-self-end" style="padding-bottom:10px;">~</div>
+						<div class="col-1 align-self-end">
+							<label for="#" class="form-label">Hr</label>
+							<select name="fhr" id="fhr" class="form-select" ></select>
+						</div>
+						<div class="col-1 align-self-end">
+							<label for="#" class="form-label">Min</label>
+							<select name="fmin" id="fmin" class="form-select" ></select>
+						</div>
+						<div class="col align-self-end mb-s1">
+							<button type="button" class="btn btn-primary" onclick="fn_reports();">Select</button>
+							<button type="button" class="btn btn-success" id="excel"><i class="fas fa-file-excel me-2"></i>Excel</button>
+							<button type="button" class="btn btn-success" id="csv"><i class="fas fa-file-csv me-2"></i>csv</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		<!-- end col -->
+		</form>
+		<!--start row2 -->
+		<div class="card">
+			<div class="card-header-tb justify-content-between d-flex align-items-center">
+				<h4 class="card-title" ><i class="uil uil-map-marker text-success font-size-20 pe-1"></i><span id="wthrMinTitle"></span></h4>
+				<span><i class="uil uil-check-circle text-success font-size-18 pe-1"></i><span id='wthrMinSubTitle'></span></span>
+			</div>
+			<div class="card-body">
+				<div class="grid-bx">
+				<!-- jqxGrid : START -->
+				<div id="jqxGrid"></div>
+				</div>
+			</div>
+		</div><!-- end card body -->
+	</div><!-- container-fluid -->
+</div><!-- End Page-content -->
+      
+        
+
+				<!-- /container -->
+					
+
+
+<!-- <footer class="footer">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-sm-6">
+                Thai Meteorological Department Automatic Weather System.
+            </div>
+            <div class="col-sm-6">
+                <div class="text-sm-end d-none d-sm-block">
+                    Copyright © 2008 METEORLOGICAL DEPARTMENT. All Rights Reserved
+                </div>
+            </div>
+        </div>
+    </div>
+</footer> -->
+<div id="footers"></div>
+<script src="/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
+	    <script src="/libs/metismenujs/metismenujs.min.js"></script>
+	    <script src="/libs/simplebar/simplebar.min.js"></script>
+	    <script src="/libs/feather-icons/feather.min.js"></script>
+	    <script src="/js/app.js" ></script>
+	   <!--  <script src="/js/popover.js"></script> -->
+
+
+				
+			</div>
+		</div>
+		<!-- ===== /wrap ====== -->
+		
+	</body>
+</html>

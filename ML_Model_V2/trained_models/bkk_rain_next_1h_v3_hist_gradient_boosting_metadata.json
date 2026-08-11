@@ -1,0 +1,99 @@
+{
+  "model_name": "bkk_rain_next_1h_v3_hist_gradient_boosting",
+  "model_path": "C:\\Users\\Brandon\\Documents\\Phase 1\\ML_Model_V2\\trained_models\\bkk_rain_next_1h_v3_hist_gradient_boosting.joblib",
+  "feature_table": "bkk_weather_lag_features_v3",
+  "target_column": "rain_next_1h",
+  "rain_threshold_mm": 0.1,
+  "feature_columns": [
+    "temperature_2m",
+    "dew_point_2m",
+    "relative_humidity_2m",
+    "precipitation",
+    "cloud_cover",
+    "surface_pressure",
+    "wind_direction_10m",
+    "wind_speed_10m",
+    "pressure_msl",
+    "cloud_cover_lag_1h",
+    "cloud_cover_lag_2h",
+    "cloud_cover_lag_3h",
+    "cloud_cover_lag_4h",
+    "cloud_cover_lag_5h",
+    "cloud_cover_lag_6h",
+    "cloud_cover_lag_24h",
+    "cloud_cover_lag_48h",
+    "relative_humidity_2m_lag_1h",
+    "relative_humidity_2m_lag_2h",
+    "relative_humidity_2m_lag_3h",
+    "relative_humidity_2m_lag_4h",
+    "relative_humidity_2m_lag_5h",
+    "relative_humidity_2m_lag_6h",
+    "relative_humidity_2m_lag_24h",
+    "relative_humidity_2m_lag_48h",
+    "dew_point_2m_lag_1h",
+    "dew_point_2m_lag_2h",
+    "dew_point_2m_lag_3h",
+    "dew_point_2m_lag_4h",
+    "dew_point_2m_lag_5h",
+    "dew_point_2m_lag_6h",
+    "dew_point_2m_lag_24h",
+    "dew_point_2m_lag_48h"
+  ],
+  "current_feature_columns": [
+    "temperature_2m",
+    "dew_point_2m",
+    "relative_humidity_2m",
+    "precipitation",
+    "cloud_cover",
+    "surface_pressure",
+    "wind_direction_10m",
+    "wind_speed_10m",
+    "pressure_msl"
+  ],
+  "lag_source_columns": [
+    "cloud_cover",
+    "relative_humidity_2m",
+    "dew_point_2m"
+  ],
+  "lag_hours": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    24,
+    48
+  ],
+  "train_end_exclusive": "2024-11-01 13:00:00+00:00",
+  "validation_end_exclusive": "2025-08-28 06:00:00+00:00",
+  "metrics": {
+    "train": {
+      "split": "train",
+      "rows": 1879640,
+      "rain_rate": 0.22844746866421228,
+      "predicted_rain_rate_at_0_5": 0.20222808622927796,
+      "brier_score": 0.0841569014100814,
+      "roc_auc": 0.929432741794342,
+      "pr_auc": 0.8174008906833405
+    },
+    "validation": {
+      "split": "validation",
+      "rows": 402808,
+      "rain_rate": 0.18601666302556055,
+      "predicted_rain_rate_at_0_5": 0.15815723620186292,
+      "brier_score": 0.08384717196678002,
+      "roc_auc": 0.9140854734458873,
+      "pr_auc": 0.7352426263177593
+    },
+    "test": {
+      "split": "test",
+      "rows": 402808,
+      "rain_rate": 0.1890801572957836,
+      "predicted_rain_rate_at_0_5": 0.14500456793310956,
+      "brier_score": 0.08585912429332557,
+      "roc_auc": 0.9101023607289698,
+      "pr_auc": 0.7380039336745856
+    }
+  }
+}

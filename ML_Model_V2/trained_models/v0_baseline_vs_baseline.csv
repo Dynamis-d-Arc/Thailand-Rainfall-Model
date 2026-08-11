@@ -1,0 +1,9 @@
+source,horizon_h,rain_rate,roc_auc,pr_auc,precision,recall,f1
+"BKK_Rain_V0 (OM, 36 feat, OM labels)",1,0.1624,0.9107,0.7001,0.6562,0.6632,0.6597
+"BKK_Rain_V0 (OM, 36 feat, OM labels)",2,0.2184,0.8952,0.7258,0.6651,0.6629,0.664
+"BKK_Rain_V0 (OM, 36 feat, OM labels)",3,0.2632,0.8929,0.7629,0.6899,0.6851,0.6875
+"BKK_Rain_V0 (OM, 36 feat, OM labels)",6,0.3644,0.8869,0.8188,0.7178,0.7667,0.7415
+"TMD_BKK_V0 (TMD, 40 feat, gauge labels)",1,0.0734,0.8833,0.5562,0.5724,0.528,0.5493
+"TMD_BKK_V0 (TMD, 40 feat, gauge labels)",2,0.1075,0.8489,0.5396,0.5394,0.4868,0.5118
+"TMD_BKK_V0 (TMD, 40 feat, gauge labels)",3,0.1364,0.8279,0.5388,0.5703,0.4326,0.492
+"TMD_BKK_V0 (TMD, 40 feat, gauge labels)",6,0.2084,0.7996,0.5676,0.4694,0.5789,0.5185

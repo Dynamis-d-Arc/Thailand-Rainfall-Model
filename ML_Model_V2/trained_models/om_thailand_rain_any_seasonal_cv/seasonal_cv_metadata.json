@@ -1,0 +1,98 @@
+{
+  "purpose": "month-blocked CV to measure seasonal variation hidden by the V1 single split",
+  "precompute_table": "\"OM_THAILAND_DATA_PRECOMPUTE\"",
+  "fold_size_months": 3,
+  "n_folds": 4,
+  "purge_hours": 24,
+  "folds": [
+    [
+      "2025-07",
+      "2025-08",
+      "2025-09"
+    ],
+    [
+      "2025-10",
+      "2025-11",
+      "2025-12"
+    ],
+    [
+      "2026-01",
+      "2026-02",
+      "2026-03"
+    ],
+    [
+      "2026-04",
+      "2026-05",
+      "2026-06"
+    ]
+  ],
+  "model_plan": {
+    "1": "lightgbm",
+    "2": "lightgbm",
+    "3": "hist_gradient_boosting",
+    "6": "hist_gradient_boosting"
+  },
+  "v1_thresholds_used": {
+    "3": 0.40000000000000013,
+    "6": 0.40000000000000013,
+    "1": 0.6500000000000001,
+    "2": 0.6000000000000002
+  },
+  "rows": 6808840,
+  "oof_coverage": 1.0,
+  "summary_vs_v1": [
+    {
+      "horizon_h": 1,
+      "V1_headline_roc_auc": 0.9141829200566196,
+      "CV_mean_roc_auc": 0.9382605753440916,
+      "CV_worst_month_roc_auc": 0.9088145341650034,
+      "CV_worst_month": "2025-09",
+      "V1_headline_f1": 0.7871383951444448,
+      "CV_mean_f1": 0.714179142440554,
+      "CV_worst_month_f1": 0.5332174668694329,
+      "f1_spread": 0.290196151426114,
+      "best_threshold_min": 0.45000000000000007,
+      "best_threshold_max": 0.8500000000000002
+    },
+    {
+      "horizon_h": 2,
+      "V1_headline_roc_auc": 0.891709719568178,
+      "CV_mean_roc_auc": 0.920993639591608,
+      "CV_worst_month_roc_auc": 0.8839806966752958,
+      "CV_worst_month": "2026-05",
+      "V1_headline_f1": 0.7981177175354554,
+      "CV_mean_f1": 0.7139478254104482,
+      "CV_worst_month_f1": 0.49742770977470285,
+      "f1_spread": 0.33861883253288794,
+      "best_threshold_min": 0.30000000000000004,
+      "best_threshold_max": 0.8000000000000002
+    },
+    {
+      "horizon_h": 3,
+      "V1_headline_roc_auc": 0.8790831391647376,
+      "CV_mean_roc_auc": 0.9090159593379057,
+      "CV_worst_month_roc_auc": 0.8681409615416879,
+      "CV_worst_month": "2026-05",
+      "V1_headline_f1": 0.8149787955746219,
+      "CV_mean_f1": 0.7292780716562431,
+      "CV_worst_month_f1": 0.5255743651753325,
+      "f1_spread": 0.33443424383627696,
+      "best_threshold_min": 0.20000000000000004,
+      "best_threshold_max": 0.5000000000000001
+    },
+    {
+      "horizon_h": 6,
+      "V1_headline_roc_auc": 0.861990098961519,
+      "CV_mean_roc_auc": 0.8930010937821987,
+      "CV_worst_month_roc_auc": 0.8459501431408667,
+      "CV_worst_month": "2026-05",
+      "V1_headline_f1": 0.8564707196358889,
+      "CV_mean_f1": 0.7585789585663624,
+      "CV_worst_month_f1": 0.5694056493830815,
+      "f1_spread": 0.32057542061888034,
+      "best_threshold_min": 0.25000000000000006,
+      "best_threshold_max": 0.5500000000000002
+    }
+  ],
+  "caveat": "Only 12 months exist, so each held-out block is also an unseen season. Degradation mixes 'harder season' with 'season never trained on'; multi-year data is required to separate the two."
+}

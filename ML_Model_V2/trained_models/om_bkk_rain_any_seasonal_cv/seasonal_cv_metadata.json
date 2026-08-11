@@ -1,0 +1,129 @@
+{
+  "purpose": "year-blocked and season-blocked CV; separates 'harder season' from 'season never trained on', which Thailand_Rain_Seasonal_CV could not",
+  "precompute_table": "\"OM_BKK_DATA_PRECOMPUTE\"",
+  "rows": 2453568,
+  "span": [
+    "2021-07-20T06:00:00",
+    "2026-07-19T21:00:00"
+  ],
+  "purge_hours": 24,
+  "part_a_year_folds": [
+    "2021",
+    "2022",
+    "2023",
+    "2024",
+    "2025",
+    "2026"
+  ],
+  "part_b_quarter_folds": {
+    "1": [
+      1,
+      2,
+      3
+    ],
+    "2": [
+      4,
+      5,
+      6
+    ],
+    "3": [
+      7,
+      8,
+      9
+    ],
+    "4": [
+      10,
+      11,
+      12
+    ]
+  },
+  "volume_control_horizon": 1,
+  "volume_control_train_rows": 1826736,
+  "model_plan": {
+    "1": "lightgbm",
+    "2": "lightgbm",
+    "3": "hist_gradient_boosting",
+    "6": "hist_gradient_boosting"
+  },
+  "v1_thresholds_used": {
+    "3": 0.3500000000000001,
+    "6": 0.3500000000000001,
+    "1": 0.6000000000000002,
+    "2": 0.5500000000000002
+  },
+  "oof_coverage_a": 1.0,
+  "oof_coverage_b": 1.0,
+  "summary_vs_v1": [
+    {
+      "horizon_h": 1,
+      "V1_headline_roc_auc": 0.9254831512769016,
+      "V1_test_rain_rate": 0.162376345254919,
+      "CV_mean_roc_auc": 0.9225615880096515,
+      "CV_worst_month_roc_auc": 0.8621844545375975,
+      "CV_worst_month": "2025-10",
+      "V1_headline_f1": 0.6808510638297872,
+      "CV_mean_f1": 0.6817646283175806,
+      "CV_worst_month_f1": 0.3333333333333333,
+      "f1_spread": 0.5459798377182199,
+      "best_threshold_min": 0.3500000000000001,
+      "best_threshold_max": 0.8500000000000002,
+      "mean_brier_skill": 0.28879139185953884,
+      "mean_cost_of_unseen_season_roc": 0.0017260969849254386
+    },
+    {
+      "horizon_h": 2,
+      "V1_headline_roc_auc": 0.911800383295692,
+      "V1_test_rain_rate": 0.2183797151864333,
+      "CV_mean_roc_auc": 0.899175452018582,
+      "CV_worst_month_roc_auc": 0.819837536065056,
+      "CV_worst_month": "2025-10",
+      "V1_headline_f1": 0.6891300826178519,
+      "CV_mean_f1": 0.6817768155417316,
+      "CV_worst_month_f1": 0.23809523809523808,
+      "f1_spread": 0.6527238454451176,
+      "best_threshold_min": 0.30000000000000004,
+      "best_threshold_max": 0.8000000000000002,
+      "mean_brier_skill": 0.30702131080032974,
+      "mean_cost_of_unseen_season_roc": 0.002486499008171874
+    },
+    {
+      "horizon_h": 3,
+      "V1_headline_roc_auc": 0.9024122104716918,
+      "V1_test_rain_rate": 0.2631699097728014,
+      "CV_mean_roc_auc": 0.8862191584409955,
+      "CV_worst_month_roc_auc": 0.7936501491825464,
+      "CV_worst_month": "2025-10",
+      "V1_headline_f1": 0.7038852531765017,
+      "CV_mean_f1": 0.6926942030828221,
+      "CV_worst_month_f1": 0.171875,
+      "f1_spread": 0.7292540349882357,
+      "best_threshold_min": 0.1,
+      "best_threshold_max": 0.5000000000000001,
+      "mean_brier_skill": 0.37503135859564934,
+      "mean_cost_of_unseen_season_roc": 0.0025766670703914842
+    },
+    {
+      "horizon_h": 6,
+      "V1_headline_roc_auc": 0.8927994819179894,
+      "V1_test_rain_rate": 0.3644363517773671,
+      "CV_mean_roc_auc": 0.8671474089348448,
+      "CV_worst_month_roc_auc": 0.7531955078359448,
+      "CV_worst_month": "2026-03",
+      "V1_headline_f1": 0.7495026525198939,
+      "CV_mean_f1": 0.7315098211552463,
+      "CV_worst_month_f1": 0.08379888268156424,
+      "f1_spread": 0.8282932706301954,
+      "best_threshold_min": 0.15000000000000002,
+      "best_threshold_max": 0.5500000000000002,
+      "mean_brier_skill": 0.3338232061516131,
+      "mean_cost_of_unseen_season_roc": 0.003669145602991003
+    }
+  ],
+  "mean_cost_of_unseen_season_roc_by_horizon": {
+    "1": 0.0017260969849254386,
+    "2": 0.002486499008171874,
+    "3": 0.0025766670703914842,
+    "6": 0.003669145602991003
+  },
+  "caveat": "Part A and Part B train on different row counts; section 6 measures that confound at 1h only. Labels come from Open-Meteo `precipitation`, which is ECMWF model output rather than an observation, so every number here is agreement with a forecast, not with measured rain."
+}
