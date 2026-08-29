@@ -1,0 +1,211 @@
+"""Rainwatch dashboard server.
+
+Serves Dashboard/index.html on localhost and keeps the prediction data fresh:
+once per hour (at minute >= RUN_MINUTE, when no CSV exists for the current
+hour yet) it runs `Thailand_Rain_V10_deploy.py predict`, converts every
+v10_predictions_*.csv into Dashboard/data/pred_<stamp>.json, and updates
+data/index.json + data/status.json. The page polls those files.
+
+Usage:
+    python Dashboard/rainwatch_server.py [--port 8901] [--no-predict]
+
+--no-predict serves whatever CSVs already exist without ever calling the
+live APIs (useful offline or when rate-limited).
+"""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import threading
+import time
+from datetime import datetime
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parent           # Dashboard/
+PROJ = ROOT.parent
+PRED_DIR = PROJ / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v10_deploy"
+V9_DIR = PROJ / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v9_2026_decay"
+DATA = ROOT / "data"
+RUN_MINUTE = 10        # earliest minute past the hour to launch a predict run
+PREDICT_TIMEOUT = 25 * 60
+
+P_COLS = ["p_h1_0.1mm", "p_h3_0.1mm", "p_h6_0.1mm",
+          "p_h1_1.0mm", "p_h3_1.0mm", "p_h6_1.0mm"]
+F_COLS = [c.replace("p_", "flag_") for c in P_COLS]
+
+_status_lock = threading.Lock()
+STATUS = {"last_attempt": None, "last_success": None, "last_error": None,
+          "running": False, "run_minute": RUN_MINUTE, "predict_enabled": True}
+
+
+def log(msg):
+    print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
+
+
+def atomic_write(path: Path, text: str):
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def save_status():
+    with _status_lock:
+        atomic_write(DATA / "status.json", json.dumps(STATUS))
+
+
+def csv_to_json(csv_path: Path, out_path: Path):
+    df = pd.read_csv(csv_path)
+    cells = []
+    for row in df.itertuples(index=False):
+        d = dict(zip(df.columns, row))
+        flags = sum(int(d[F_COLS[i]]) << i for i in range(6))
+        cells.append([int(d["grid_number"]),
+                      round(float(d["longitude"]), 4),
+                      round(float(d["latitude"]), 4)]
+                     + [round(float(d[c]), 3) for c in P_COLS] + [flags])
+    payload = {"issue": str(df["issue_local"].iloc[0])[:16], "cells": cells}
+    atomic_write(out_path, json.dumps(payload, separators=(",", ":")))
+
+
+def convert_all():
+    """Convert any new/updated prediction CSVs and rewrite the index."""
+    DATA.mkdir(exist_ok=True)
+    stamps = []
+    for csv_path in sorted(PRED_DIR.glob("v10_predictions_*.csv")):
+        stamp = csv_path.stem.replace("v10_predictions_", "")
+        out = DATA / f"pred_{stamp}.json"
+        try:
+            if not out.exists() or out.stat().st_mtime < csv_path.stat().st_mtime:
+                csv_to_json(csv_path, out)
+                log(f"converted {csv_path.name}")
+            stamps.append(stamp)
+        except Exception as exc:
+            log(f"convert failed for {csv_path.name}: {exc}")
+    index = {"issues": stamps, "latest": stamps[-1] if stamps else None,
+             "generated": datetime.now().isoformat(timespec="seconds")}
+    atomic_write(DATA / "index.json", json.dumps(index))
+    build_health()
+    return stamps
+
+
+def build_health():
+    """data/health.json — the V9 regime metric.
+
+    `labeled` is the canonical monthly p(cold-top <=235 K near cell | IMERG rain) from the
+    V9 analysis; it only extends when IMERG is backfilled. `live` is the per-run proxy the
+    V10 predict phase appends to v10_health_log.csv (cold-top share among all cells and
+    among alert cells) — unlabeled, but it moves hourly.
+    """
+    payload = {"labeled": [], "baseline": None, "live": []}
+    rain_type = V9_DIR / "v9_rain_type_by_month.csv"
+    if rain_type.exists():
+        df = pd.read_csv(rain_type, dtype={"month": str})
+        payload["labeled"] = [
+            {"month": r.month, "p": round(float(r.p_cold235_given_rain), 4),
+             "wet_rows": int(r.wet_rows)}
+            for r in df.itertuples()]
+        base = df[df["month"].astype(int) < 202600]["p_cold235_given_rain"]
+        if len(base):
+            payload["baseline"] = {"mean": round(float(base.mean()), 4),
+                                   "min": round(float(base.min()), 4),
+                                   "max": round(float(base.max()), 4)}
+    health_log = PRED_DIR / "v10_health_log.csv"
+    if health_log.exists():
+        try:
+            lg = pd.read_csv(health_log).sort_values("issue_local").tail(240)
+            payload["live"] = json.loads(lg.to_json(orient="records"))
+        except Exception as exc:
+            log(f"health log read failed: {exc}")
+    atomic_write(DATA / "health.json", json.dumps(payload))
+
+
+def run_predict():
+    with _status_lock:
+        STATUS["last_attempt"] = datetime.now().isoformat(timespec="seconds")
+        STATUS["running"] = True
+    save_status()
+    log("launching V10 predict")
+    try:
+        result = subprocess.run(
+            [sys.executable, str(PROJ / "Thailand_Rain_V10_deploy.py"), "predict"],
+            cwd=str(PROJ), capture_output=True, text=True, timeout=PREDICT_TIMEOUT)
+        if result.returncode != 0:
+            tail = (result.stdout + result.stderr).strip()[-500:]
+            raise RuntimeError(f"predict exited {result.returncode}: {tail}")
+        with _status_lock:
+            STATUS["last_success"] = datetime.now().isoformat(timespec="seconds")
+            STATUS["last_error"] = None
+        log("predict finished ok")
+    except Exception as exc:
+        with _status_lock:
+            STATUS["last_error"] = f"{datetime.now():%Y-%m-%d %H:%M} {exc}"
+        log(f"predict FAILED: {exc}")
+    finally:
+        with _status_lock:
+            STATUS["running"] = False
+        convert_all()
+        save_status()
+
+
+def predict_loop():
+    while True:
+        try:
+            now = datetime.now()
+            want = now.strftime("%Y%m%d_%H00")
+            have = (PRED_DIR / f"v10_predictions_{want}.csv").exists()
+            if now.minute >= RUN_MINUTE and not have:
+                run_predict()
+        except Exception as exc:
+            log(f"predict loop error: {exc}")
+        time.sleep(60)
+
+
+class Handler(SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(ROOT), **kwargs)
+
+    def end_headers(self):
+        # data files must never be cached — the page polls them
+        if "/data/" in self.path or self.path.endswith(".json"):
+            self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
+    def log_message(self, fmt, *args):
+        pass  # keep the console readable; predict progress is what matters
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--port", type=int, default=8901)
+    ap.add_argument("--no-predict", action="store_true",
+                    help="serve existing predictions only, never call live APIs")
+    args = ap.parse_args()
+
+    stamps = convert_all()
+    STATUS["predict_enabled"] = not args.no_predict
+    save_status()
+    log(f"{len(stamps)} prediction snapshot(s) available"
+        + (f", latest {stamps[-1]}" if stamps else ""))
+
+    if args.no_predict:
+        log("predict loop disabled (--no-predict)")
+    else:
+        threading.Thread(target=predict_loop, daemon=True).start()
+        log(f"predict loop armed: runs when no CSV exists for the current "
+            f"hour and minute >= {RUN_MINUTE:02d}")
+
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    log(f"Rainwatch dashboard: http://localhost:{args.port}")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        log("stopped")
+
+
+if __name__ == "__main__":
+    main()

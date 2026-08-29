@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thailand Rainwatch</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%A7%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Schibsted+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --paper: #F4F7FA;
+    --panel: #FFFFFF;
+    --ink: #17222D;
+    --ink-2: #48596A;
+    --muted: #71808F;
+    --hairline: #D9E2EA;
+    --accent: #0F4C81;
+    --on-accent: #FFFFFF;
+    --flag: #A05E1B;
+    --ok: #2E7D4F;
+    --warn: #A05E1B;
+    --err: #A33B2E;
+    --tooltip-bg: #17222D;
+    --tooltip-ink: #F2F6FA;
+    --focus: #0F4C81;
+    --ramp: #DCEAF5, #B5D5EC, #83B6DE, #4E92C4, #2A6FA5, #14538A, #0A3861;
+  }
+  html.dark {
+    --paper: #0E141B;
+    --panel: #151D26;
+    --ink: #E5EDF4;
+    --ink-2: #AEBDCB;
+    --muted: #7E8FA0;
+    --hairline: #263240;
+    --accent: #6FB1E4;
+    --on-accent: #0E141B;
+    --flag: #E2A254;
+    --ok: #62B98A;
+    --warn: #E2A254;
+    --err: #E07A6B;
+    --tooltip-bg: #E9F0F6;
+    --tooltip-ink: #17222D;
+    --focus: #6FB1E4;
+    --ramp: #223140, #284B67, #31688D, #4489B4, #6BAAD6, #99CCEE, #CDE8FB;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: "Spline Sans Mono", ui-monospace, Consolas, monospace; }
+
+  .shell {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    height: 100vh;
+  }
+  .rail {
+    overflow-y: auto;
+    padding: 22px 18px 28px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .map-col { position: relative; }
+  #map {
+    position: absolute;
+    inset: 14px 14px 14px 0;
+    border-radius: 14px;
+    border: 1px solid var(--hairline);
+    background: var(--paper);
+  }
+  @media (max-width: 880px) {
+    .shell { display: flex; flex-direction: column; height: auto; }
+    .map-col { order: -1; height: 62vh; }
+    #map { inset: 10px; }
+    .rail { padding: 14px; }
+  }
+
+  .masthead { display: flex; align-items: flex-start; gap: 10px; }
+  .masthead h1 {
+    font-family: "Bricolage Grotesque", "Schibsted Grotesk", sans-serif;
+    font-weight: 800;
+    font-size: 28px;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    margin: 0;
+    flex: 1;
+  }
+  .theme-btn {
+    appearance: none;
+    border: 1px solid var(--hairline);
+    background: var(--panel);
+    color: var(--ink-2);
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    flex: none;
+  }
+  .sub { color: var(--ink-2); font-size: 13px; margin: 2px 0 0; }
+
+  .stamp-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 6px 11px;
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    background: var(--panel);
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .chip b { color: var(--ink); font-weight: 600; }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; }
+  .chip.warn .dot { background: var(--warn); }
+  .chip.err .dot { background: var(--err); }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    padding: 15px;
+  }
+  .panel-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 9px;
+  }
+  .panel-label:not(:first-child) { margin-top: 15px; }
+
+  select.issue {
+    width: 100%;
+    font: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    padding: 7px 9px;
+  }
+
+  .seg { display: flex; gap: 6px; }
+  .seg button {
+    flex: 1;
+    appearance: none;
+    border: 1px solid var(--hairline);
+    background: transparent;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 4px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+  }
+  .seg button:focus-visible, .check:focus-visible, .theme-btn:focus-visible,
+  select.issue:focus-visible {
+    outline: 2px solid var(--focus); outline-offset: 2px;
+  }
+
+  .check {
+    display: flex; align-items: center; gap: 9px;
+    margin-top: 14px;
+    cursor: pointer; user-select: none;
+    font-size: 13px; color: var(--ink-2);
+    background: none; border: none; padding: 0; font-family: inherit;
+  }
+  .check .box {
+    width: 30px; height: 18px; border-radius: 9px;
+    background: var(--hairline);
+    position: relative; flex: none;
+    transition: background 0.15s;
+  }
+  .check .box::after {
+    content: "";
+    position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--panel);
+    transition: left 0.15s;
+  }
+  .check[aria-pressed="true"] .box { background: var(--flag); }
+  .check[aria-pressed="true"] .box::after { left: 14px; }
+  @media (prefers-reduced-motion: reduce) {
+    .check .box, .check .box::after { transition: none; }
+  }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 11px 16px; }
+  .stat .v {
+    font-family: "Spline Sans Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 20px; font-weight: 600; line-height: 1.15;
+    color: var(--ink);
+  }
+  .stat .k { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .stat.wide { grid-column: 1 / -1; }
+  .stat.wide .v { font-size: 14.5px; font-family: inherit; font-weight: 600; }
+
+  .hist { margin-top: 13px; }
+  .hist-bars {
+    display: flex; align-items: flex-end; gap: 1px;
+    height: 42px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .hist-bars .bar { flex: 1; border-radius: 2px 2px 0 0; }
+  .hist-x {
+    display: flex; justify-content: space-between;
+    font-size: 10.5px; color: var(--muted);
+    font-family: "Spline Sans Mono", ui-monospace, monospace;
+    margin-top: 3px;
+  }
+
+  .legend-ramp { height: 10px; border-radius: 5px; border: 1px solid var(--hairline); }
+  .legend-x {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--muted);
+    font-family: "Spline Sans Mono", ui-monospace, monospace;
+    margin-top: 4px;
+  }
+  .legend-flag {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 11px;
+    font-size: 12px; color: var(--ink-2);
+  }
+  .legend-flag .sw {
+    width: 14px; height: 14px; border-radius: 3px;
+    border: 2px solid var(--flag);
+    flex: none;
+  }
+
+  .health-status {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; color: var(--ink-2);
+    margin-bottom: 10px;
+  }
+  .health-status .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .health-status b {
+    color: var(--ink);
+    font-family: "Spline Sans Mono", ui-monospace, monospace;
+    font-weight: 600;
+  }
+  .health-chart-wrap { position: relative; }
+  #healthChart { display: block; width: 100%; height: auto; }
+  #healthChart .grid { stroke: var(--hairline); stroke-width: 0.6; }
+  #healthChart .ytick, #healthChart .xtick {
+    fill: var(--muted);
+    font-family: "Spline Sans Mono", ui-monospace, monospace;
+    font-size: 8px;
+  }
+  #healthChart .band { fill: var(--accent); fill-opacity: 0.10; }
+  #healthChart .series { fill: none; stroke: var(--accent); stroke-width: 1.6; }
+  #healthChart .lastlabel {
+    font-family: "Spline Sans Mono", ui-monospace, monospace;
+    font-size: 9px; font-weight: 600;
+    fill: var(--ink);
+  }
+  .health-tip {
+    position: absolute; display: none;
+    background: var(--tooltip-bg); color: var(--tooltip-ink);
+    border-radius: 7px; padding: 5px 8px;
+    font-size: 11px; line-height: 1.4;
+    pointer-events: none; white-space: nowrap; z-index: 5;
+    box-shadow: 0 3px 12px rgba(10, 20, 30, 0.25);
+  }
+  .health-live {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 12px; color: var(--ink-2);
+    margin-top: 10px;
+  }
+  .health-live b {
+    color: var(--ink);
+    font-family: "Spline Sans Mono", ui-monospace, monospace;
+    font-weight: 600;
+  }
+  .health-live svg { flex: none; }
+  .health-note { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin: 9px 0 0; }
+
+  .notes { font-size: 12px; color: var(--muted); line-height: 1.55; }
+  .notes p { margin: 0 0 8px; }
+  .notes p:last-child { margin: 0; }
+  .notes b { color: var(--ink-2); font-weight: 600; }
+
+  /* Leaflet chrome in our palette */
+  .leaflet-container { font: inherit; }
+  .leaflet-control-zoom a {
+    background: var(--panel) !important;
+    color: var(--ink) !important;
+    border-color: var(--hairline) !important;
+  }
+  .leaflet-control-attribution {
+    background: color-mix(in srgb, var(--panel) 82%, transparent) !important;
+    color: var(--muted) !important;
+    font-size: 10px !important;
+  }
+  .leaflet-control-attribution a { color: var(--ink-2) !important; }
+
+  .rw-tip {
+    background: var(--tooltip-bg) !important;
+    color: var(--tooltip-ink) !important;
+    border: none !important;
+    border-radius: 9px !important;
+    box-shadow: 0 4px 18px rgba(10, 20, 30, 0.3) !important;
+    padding: 10px 12px !important;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .rw-tip::before { display: none; }
+  .rw-tip .tt-head { font-weight: 700; font-size: 12.5px; }
+  .rw-tip .tt-sub { opacity: 0.72; margin-bottom: 7px; }
+  .rw-tip table {
+    border-collapse: collapse; width: 100%;
+    font-family: "Spline Sans Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 11.5px;
+  }
+  .rw-tip th {
+    font-weight: 500; text-align: right; opacity: 0.72;
+    padding: 1px 0 3px; font-family: "Schibsted Grotesk", sans-serif;
+  }
+  .rw-tip th:first-child { text-align: left; }
+  .rw-tip td { text-align: right; padding: 1px 0 1px 12px; }
+  .rw-tip td.rowh { text-align: left; padding-left: 0; opacity: 0.72; font-family: "Schibsted Grotesk", sans-serif; }
+  .rw-tip td.hot { font-weight: 700; }
+  .rw-tip .fl { color: #C77A28; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="rail">
+    <div>
+      <div class="masthead">
+        <h1>Thailand Rainwatch</h1>
+        <button type="button" class="theme-btn" id="themeBtn" title="Theme">Auto</button>
+      </div>
+      <p class="sub">Nationwide rain probability, 833 cells — ECMWF IFS + Himawari IR, model V10. Auto-refreshes hourly.</p>
+    </div>
+
+    <div class="stamp-row">
+      <span class="chip" id="issueChip"><span class="dot"></span><span>Issued <b id="issueTime">—</b></span></span>
+      <span class="chip" id="serverChip"><span class="dot"></span><span id="serverText">server —</span></span>
+    </div>
+
+    <div class="panel">
+      <p class="panel-label">Issue time</p>
+      <select class="issue" id="issueSelect" aria-label="Prediction issue time"></select>
+      <p class="panel-label">Horizon</p>
+      <div class="seg" id="segHorizon" role="group" aria-label="Forecast horizon">
+        <button type="button" data-h="0" aria-pressed="true">+1 h</button>
+        <button type="button" data-h="1" aria-pressed="false">+3 h</button>
+        <button type="button" data-h="2" aria-pressed="false">+6 h</button>
+      </div>
+      <p class="panel-label">Rain threshold</p>
+      <div class="seg" id="segThr" role="group" aria-label="Rain threshold">
+        <button type="button" data-t="0" aria-pressed="true">&ge; 0.1 mm — any rain</button>
+        <button type="button" data-t="1" aria-pressed="false">&ge; 1.0 mm</button>
+      </div>
+      <button type="button" class="check" id="flagToggle" aria-pressed="true">
+        <span class="box"></span>
+        <span>Outline alert cells (F1-optimal threshold)</span>
+      </button>
+    </div>
+
+    <div class="panel">
+      <p class="panel-label">This layer</p>
+      <div class="stats">
+        <div class="stat"><div class="v" id="statFlagged">—</div><div class="k">cells on alert (of 833)</div></div>
+        <div class="stat"><div class="v" id="statMedian">—</div><div class="k">median probability</div></div>
+        <div class="stat wide"><div class="v" id="statPeak">—</div><div class="k">wettest cell</div></div>
+      </div>
+      <div class="hist">
+        <div class="hist-bars" id="histBars" aria-hidden="true"></div>
+        <div class="hist-x"><span>0</span><span>probability</span><span>1</span></div>
+      </div>
+    </div>
+
+    <div class="panel" id="healthPanel" hidden>
+      <p class="panel-label">IR health — p(cold-top | rain)</p>
+      <div class="health-status" id="healthStatus"></div>
+      <div class="health-chart-wrap">
+        <svg id="healthChart" viewBox="0 0 330 130" role="img"
+             aria-label="Monthly share of rain hours with a cold cloud top"></svg>
+        <div class="health-tip" id="healthTip"></div>
+      </div>
+      <div class="health-live" id="healthLive"></div>
+      <p class="health-note">Share of IMERG-labeled rain hours with a &le;235 K cold top nearby
+      (monthly; shaded band = 2024–25 range). Infrared cannot see warm shallow rain — below the
+      band, expect the Himawari gain to shrink. Labeled months extend with IMERG backfill; the
+      live proxy from each hourly run is unlabeled.</p>
+    </div>
+
+    <div class="panel">
+      <p class="panel-label">Reading the map</p>
+      <div class="legend-ramp" id="legendRamp"></div>
+      <div class="legend-x"><span>0</span><span>rain probability</span><span>1</span></div>
+      <div class="legend-flag"><span class="sw"></span><span>alert — probability crossed this layer&rsquo;s decision threshold</span></div>
+    </div>
+
+    <div class="panel notes">
+      <p><b>Self-updating.</b> The local server runs a live V10 prediction shortly after each hour and this page picks it up automatically. Older issue times stay available in the selector.</p>
+      <p><b>Caveat.</b> The satellite gain is regime-dependent: infrared cannot see warm shallow rain, so skill shrinks in weak-monsoon periods like mid-2026.</p>
+    </div>
+  </div>
+
+  <div class="map-col"><div id="map"></div></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const state = { h: 0, t: 0, flags: true, stamp: null, viewingLatest: true };
+  const layerIdx = () => state.t * 3 + state.h;
+  let cells = [];          // [grid, lon, lat, p*6, flagbits]
+  let rects = [];          // leaflet layers, same order
+  let latestStamp = null;
+
+  const CITIES = [
+    { n: "Chiang Mai", lat: 18.7883, lon: 98.9853 },
+    { n: "Khon Kaen", lat: 16.4322, lon: 102.8236 },
+    { n: "Ubon Ratchathani", lat: 15.2287, lon: 104.8564 },
+    { n: "Bangkok", lat: 13.7563, lon: 100.5018 },
+    { n: "Phuket", lat: 7.8804, lon: 98.3923 },
+    { n: "Hat Yai", lat: 7.0086, lon: 100.4747 },
+  ];
+
+  // ---------- theme ----------
+  const sysDark = matchMedia("(prefers-color-scheme: dark)");
+  let themeMode = "auto";
+  try { themeMode = localStorage.getItem("rw-theme") || "auto"; } catch (e) {}
+  const isDark = () => themeMode === "dark" || (themeMode === "auto" && sysDark.matches);
+
+  // ---------- map ----------
+  const TILES = {
+    light: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+  };
+  const ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+  const map = L.map("map", { zoomSnap: 0.25, attributionControl: true })
+    .setView([13.5, 101.3], 6);
+  let tileLayer = null;
+  function setTiles() {
+    if (tileLayer) map.removeLayer(tileLayer);
+    tileLayer = L.tileLayer(TILES[isDark() ? "dark" : "light"], {
+      attribution: ATTR, maxZoom: 12, minZoom: 5,
+    }).addTo(map);
+  }
+  const canvas = L.canvas({ padding: 0.4 });
+
+  // ---------- color ramp ----------
+  let LUT = [];
+  function rampStops() {
+    return getComputedStyle(document.documentElement)
+      .getPropertyValue("--ramp").split(",").map(s => s.trim()).filter(Boolean);
+  }
+  function buildLUT() {
+    const stops = rampStops().map(h => [
+      parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16),
+    ]);
+    LUT = [];
+    for (let i = 0; i < 256; i++) {
+      const x = i / 255 * (stops.length - 1);
+      const j = Math.min(Math.floor(x), stops.length - 2);
+      const f = x - j;
+      const c = stops[j].map((v, k) => Math.round(v + (stops[j + 1][k] - v) * f));
+      LUT.push(`rgb(${c[0]},${c[1]},${c[2]})`);
+    }
+    document.getElementById("legendRamp").style.background =
+      `linear-gradient(to right, ${rampStops().join(",")})`;
+  }
+  const color = p => LUT[Math.max(0, Math.min(255, Math.round(p * 255)))];
+  const flagColor = () =>
+    getComputedStyle(document.documentElement).getPropertyValue("--flag").trim();
+
+  function applyTheme() {
+    document.documentElement.classList.toggle("dark", isDark());
+    document.getElementById("themeBtn").textContent =
+      themeMode === "auto" ? "Auto" : themeMode === "dark" ? "Dark" : "Light";
+    setTiles();
+    buildLUT();
+    restyle();
+  }
+  document.getElementById("themeBtn").addEventListener("click", () => {
+    themeMode = themeMode === "auto" ? "light" : themeMode === "light" ? "dark" : "auto";
+    try { localStorage.setItem("rw-theme", themeMode); } catch (e) {}
+    applyTheme();
+  });
+  sysDark.addEventListener("change", () => { if (themeMode === "auto") applyTheme(); });
+
+  // ---------- helpers ----------
+  const kx = Math.cos(13 * Math.PI / 180);
+  function nearCity(lon, lat) {
+    let best = null, bd = 1e9;
+    CITIES.forEach(ct => {
+      const d = Math.hypot((ct.lon - lon) * 111.32 * kx, (ct.lat - lat) * 110.57);
+      if (d < bd) { bd = d; best = ct; }
+    });
+    return bd < 40 ? `near ${best.n}` : `${Math.round(bd)} km from ${best.n}`;
+  }
+  const HORIZONS = ["+1 h", "+3 h", "+6 h"];
+  function tipHtml(i) {
+    const c = cells[i], li = layerIdx();
+    let rows = "";
+    for (let h = 0; h < 3; h++) {
+      let tds = "";
+      for (let t = 0; t < 2; t++) {
+        const k = t * 3 + h;
+        const p = c[3 + k], fl = (c[9] >> k) & 1;
+        tds += `<td class="${k === li ? "hot" : ""}">${(p * 100).toFixed(0)}%${fl ? '<span class="fl"> ●</span>' : ""}</td>`;
+      }
+      rows += `<tr><td class="rowh">${HORIZONS[h]}</td>${tds}</tr>`;
+    }
+    return `<div class="tt-head">Cell ${c[0]}</div>` +
+      `<div class="tt-sub">${c[2].toFixed(2)}°N ${c[1].toFixed(2)}°E · ${nearCity(c[1], c[2])}</div>` +
+      `<table><tr><th></th><th>&ge;0.1 mm</th><th>&ge;1.0 mm</th></tr>${rows}</table>`;
+  }
+
+  function cellStyle(i) {
+    const c = cells[i], li = layerIdx();
+    const p = c[3 + li];
+    const fl = state.flags && ((c[9] >> li) & 1);
+    return {
+      fillColor: color(p),
+      fillOpacity: 0.16 + 0.58 * p,
+      stroke: !!fl,
+      color: flagColor(),
+      weight: 1.3,
+      opacity: 0.95,
+    };
+  }
+
+  // ---------- rendering ----------
+  function buildRects(dLon, dLat) {
+    rects.forEach(r => map.removeLayer(r));
+    rects = cells.map((c, i) => {
+      const r = L.rectangle(
+        [[c[2] - dLat / 2, c[1] - dLon / 2], [c[2] + dLat / 2, c[1] + dLon / 2]],
+        Object.assign({ renderer: canvas, interactive: true }, cellStyle(i)));
+      r.bindTooltip(() => tipHtml(i),
+        { sticky: true, direction: "top", opacity: 1, className: "rw-tip" });
+      r.on("mouseover", () => r.setStyle({ stroke: true, weight: 2.2,
+        color: getComputedStyle(document.documentElement).getPropertyValue("--ink").trim() }));
+      r.on("mouseout", () => r.setStyle(cellStyle(i)));
+      r.addTo(map);
+      return r;
+    });
+  }
+
+  function restyle() {
+    if (!cells.length) return;
+    const li = layerIdx();
+    let flagged = 0, pk = 0;
+    const ps = new Array(cells.length);
+    cells.forEach((c, i) => {
+      ps[i] = c[3 + li];
+      if ((c[9] >> li) & 1) flagged++;
+      if (ps[i] > ps[pk]) pk = i;
+      rects[i] && rects[i].setStyle(cellStyle(i));
+    });
+
+    document.getElementById("statFlagged").textContent = flagged;
+    const sorted = [...ps].sort((a, b) => a - b);
+    document.getElementById("statMedian").textContent =
+      sorted[Math.floor(sorted.length / 2)].toFixed(2);
+    const pc = cells[pk];
+    document.getElementById("statPeak").innerHTML =
+      `<span class="mono">${(ps[pk] * 100).toFixed(0)}%</span> ${nearCity(pc[1], pc[2])}`;
+
+    const NB = 22, bins = new Array(NB).fill(0);
+    ps.forEach(p => bins[Math.min(NB - 1, Math.floor(p * NB))]++);
+    const bmax = Math.max(...bins);
+    const hb = document.getElementById("histBars");
+    hb.innerHTML = "";
+    bins.forEach((n, b) => {
+      const d = document.createElement("div");
+      d.className = "bar";
+      d.style.height = (n ? Math.max(2, n / bmax * 42) : 0) + "px";
+      d.style.background = color((b + 0.5) / NB);
+      d.title = `${n} cells at p ≈ ${(b / NB).toFixed(2)}–${((b + 1) / NB).toFixed(2)}`;
+      hb.appendChild(d);
+    });
+  }
+
+  // ---------- data loading ----------
+  const fmtStamp = s =>
+    `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)} ${s.slice(9, 11)}:${s.slice(11, 13)}`;
+
+  async function fetchJson(url) {
+    const r = await fetch(url + (url.includes("?") ? "&" : "?") + "t=" + Date.now());
+    if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
+    return r.json();
+  }
+
+  let dLon = 0.2305, dLat = 0.2266;
+  async function loadIssue(stamp, fit) {
+    const data = await fetchJson(`data/pred_${stamp}.json`);
+    cells = data.cells;
+    state.stamp = stamp;
+    state.viewingLatest = stamp === latestStamp;
+
+    const lons = [...new Set(cells.map(c => c[1]))].sort((a, b) => a - b);
+    const lats = [...new Set(cells.map(c => c[2]))].sort((a, b) => a - b);
+    const step = a => Math.min(...a.slice(1).map((v, i) => v - a[i]));
+    dLon = step(lons); dLat = step(lats);
+
+    buildRects(dLon, dLat);
+    restyle();
+    updateIssueChip(data.issue);
+    if (fit) {
+      map.fitBounds([[lats[0] - 0.5, lons[0] - 0.5],
+                     [lats[lats.length - 1] + 0.5, lons[lons.length - 1] + 0.5]]);
+    }
+  }
+
+  function updateIssueChip(issueStr) {
+    const chip = document.getElementById("issueChip");
+    const age = (Date.now() - new Date(issueStr.replace(" ", "T"))) / 3.6e6;
+    const stale = state.viewingLatest && age > 2.5;
+    chip.classList.toggle("warn", stale);
+    chip.querySelector("span:last-child").innerHTML =
+      `Issued <b>${issueStr}</b>` + (stale ? ` · stale (${age.toFixed(1)} h old)` : "");
+  }
+
+  function renderIssueOptions(issues) {
+    const sel = document.getElementById("issueSelect");
+    const cur = state.stamp;
+    sel.innerHTML = "";
+    [...issues].reverse().forEach((s, idx) => {
+      const o = document.createElement("option");
+      o.value = s;
+      o.textContent = fmtStamp(s) + (idx === 0 ? "  · latest" : "");
+      sel.appendChild(o);
+    });
+    if (cur && issues.includes(cur)) sel.value = cur;
+  }
+
+  async function refreshIndex(first) {
+    let idx;
+    try { idx = await fetchJson("data/index.json"); }
+    catch (e) { setServerChip("err", "server unreachable"); return; }
+    const newLatest = idx.latest;
+    const changed = newLatest && newLatest !== latestStamp;
+    latestStamp = newLatest;
+    renderIssueOptions(idx.issues);
+    if (first) {
+      if (latestStamp) await loadIssue(latestStamp, true);
+    } else if (changed && state.viewingLatest) {
+      await loadIssue(latestStamp, false);
+      document.getElementById("issueSelect").value = latestStamp;
+    }
+    try { renderHealth(await fetchJson("data/health.json")); } catch (e) { /* optional */ }
+    try {
+      const st = await fetchJson("data/status.json");
+      if (!st.predict_enabled) setServerChip("warn", "auto-predict off");
+      else if (st.running) setServerChip("ok", "prediction running…");
+      else if (st.last_error) setServerChip("err", "last run failed — showing previous");
+      else setServerChip("ok", `auto-run ≈ ${nextRunLabel(st.run_minute)}`);
+    } catch (e) { /* status optional */ }
+  }
+
+  function nextRunLabel(runMinute) {
+    const now = new Date();
+    const cur = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}00`;
+    const d = new Date(now);
+    if (latestStamp === cur || now.getMinutes() >= (runMinute || 10)) d.setHours(d.getHours() + 1);
+    d.setMinutes(runMinute || 10);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+
+  // ---------- V9 health metric ----------
+  const monthSerial = m => +m.slice(0, 4) * 12 + (+m.slice(4, 6) - 1);
+  const monthLabel = m => `${m.slice(0, 4)}-${m.slice(4, 6)}`;
+  const pct = v => v == null || isNaN(v) ? "—" : (v * 100).toFixed(0) + "%";
+
+  function renderHealth(hp) {
+    const panel = document.getElementById("healthPanel");
+    if (!hp || !hp.labeled || !hp.labeled.length) { panel.hidden = true; return; }
+    panel.hidden = false;
+    const base = hp.baseline || { mean: 0.85, min: 0.78, max: 0.88 };
+    const stateOf = p => p >= base.min ? ["--ok", "in the healthy band"]
+      : p >= 0.72 ? ["--warn", "reduced — watch the gain"]
+      : ["--err", "low — warm-rain regime"];
+
+    const last = hp.labeled[hp.labeled.length - 1];
+    const [sv, sl] = stateOf(last.p);
+    document.getElementById("healthStatus").innerHTML =
+      `<span class="dot" style="background:var(${sv})"></span>` +
+      `<span><b>${last.p.toFixed(2)}</b> in ${monthLabel(last.month)} — ${sl}` +
+      ` (2024–25 mean ${base.mean.toFixed(2)})</span>`;
+
+    // chart
+    const W = 330, H = 130, ml = 30, mr = 10, mt = 10, mb = 20;
+    const pts = hp.labeled.map(d => ({ s: monthSerial(d.month), ...d }));
+    const s0 = pts[0].s, s1 = pts[pts.length - 1].s || pts[0].s + 1;
+    const ys = pts.map(p => p.p).concat([base.min, base.max]);
+    const lo = Math.min(...ys) - 0.04, hi = Math.max(...ys) + 0.04;
+    const X = s => ml + (s - s0) / Math.max(1, s1 - s0) * (W - ml - mr);
+    const Y = p => mt + (hi - p) / (hi - lo) * (H - mt - mb);
+
+    let svg = `<rect class="band" x="${ml}" y="${Y(base.max).toFixed(1)}" width="${W - ml - mr}" height="${(Y(base.min) - Y(base.max)).toFixed(1)}"/>`;
+    for (let t = Math.ceil(lo / 0.05) * 0.05; t <= hi + 1e-9; t += 0.05) {
+      svg += `<line class="grid" x1="${ml}" y1="${Y(t).toFixed(1)}" x2="${W - mr}" y2="${Y(t).toFixed(1)}"/>` +
+             `<text class="ytick" x="${ml - 4}" y="${(Y(t) + 2.5).toFixed(1)}" text-anchor="end">${t.toFixed(2)}</text>`;
+    }
+    const seenYears = new Set();
+    pts.forEach(p => {
+      const yr = Math.floor(p.s / 12);
+      if (!seenYears.has(yr)) {
+        seenYears.add(yr);
+        svg += `<text class="xtick" x="${X(p.s).toFixed(1)}" y="${H - 6}">${yr}</text>`;
+      }
+    });
+    let d = "", prev = null;
+    pts.forEach(p => {
+      d += (prev !== null && p.s - prev === 1 ? "L" : "M") + `${X(p.s).toFixed(1)},${Y(p.p).toFixed(1)}`;
+      prev = p.s;
+    });
+    svg += `<path class="series" d="${d}"/>`;
+    pts.forEach((p, i) => {
+      svg += `<circle cx="${X(p.s).toFixed(1)}" cy="${Y(p.p).toFixed(1)}" r="2.6" style="fill:var(${stateOf(p.p)[0]})"/>` +
+             `<circle data-i="${i}" cx="${X(p.s).toFixed(1)}" cy="${Y(p.p).toFixed(1)}" r="8" style="fill:transparent"/>`;
+    });
+    const lp = pts[pts.length - 1];
+    svg += `<text class="lastlabel" x="${(X(lp.s) - 4).toFixed(1)}" y="${(Y(lp.p) - 6).toFixed(1)}" text-anchor="end">${lp.p.toFixed(2)}</text>`;
+    const chart = document.getElementById("healthChart");
+    chart.innerHTML = svg;
+
+    const tip = document.getElementById("healthTip");
+    chart.querySelectorAll("circle[data-i]").forEach(c => {
+      c.addEventListener("mouseenter", () => {
+        const p = pts[+c.dataset.i];
+        tip.innerHTML = `<b>${monthLabel(p.month)}</b> · p ${p.p.toFixed(3)} · ${p.wet_rows.toLocaleString()} wet rows`;
+        tip.style.display = "block";
+        const wrap = chart.parentElement, sc = wrap.clientWidth / W;
+        let x = X(p.s) * sc + 10, y = Y(p.p) * (chart.clientHeight / H) - 12;
+        if (x + tip.offsetWidth > wrap.clientWidth) x = X(p.s) * sc - tip.offsetWidth - 10;
+        tip.style.left = Math.max(0, x) + "px";
+        tip.style.top = Math.max(0, y) + "px";
+      });
+      c.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+    });
+
+    // live proxy from the hourly runs
+    const liveBox = document.getElementById("healthLive");
+    if (hp.live && hp.live.length) {
+      const l = hp.live[hp.live.length - 1];
+      let spark = "";
+      const recent = hp.live.slice(-48).filter(r => r.cold235_share_flagged != null);
+      if (recent.length >= 4) {
+        const w = 84, h = 20;
+        const poly = recent.map((r, i) =>
+          `${(i / (recent.length - 1) * w).toFixed(1)},${(h - 2 - r.cold235_share_flagged * (h - 4)).toFixed(1)}`).join(" ");
+        spark = `<svg width="${w}" height="${h}" aria-hidden="true"><polyline points="${poly}" fill="none" stroke="var(--accent)" stroke-width="1.4"/></svg>`;
+      }
+      liveBox.innerHTML = `${spark}<span>live proxy ${l.issue_local.slice(11, 16)}: cold tops over ` +
+        `<b>${pct(l.cold235_share_flagged)}</b> of alert cells, <b>${pct(l.cold235_share_all)}</b> of all cells</span>`;
+    } else {
+      liveBox.innerHTML = `<span>live proxy: appears after the next hourly run</span>`;
+    }
+  }
+
+  function setServerChip(kind, text) {
+    const chip = document.getElementById("serverChip");
+    chip.classList.remove("warn", "err");
+    if (kind !== "ok") chip.classList.add(kind);
+    document.getElementById("serverText").textContent = text;
+  }
+
+  // ---------- controls ----------
+  function wireSeg(id, key, attr) {
+    const seg = document.getElementById(id);
+    seg.querySelectorAll("button").forEach(b => {
+      b.addEventListener("click", () => {
+        state[key] = +b.dataset[attr];
+        seg.querySelectorAll("button").forEach(x =>
+          x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+        restyle();
+      });
+    });
+  }
+  wireSeg("segHorizon", "h", "h");
+  wireSeg("segThr", "t", "t");
+  const ft = document.getElementById("flagToggle");
+  ft.addEventListener("click", () => {
+    state.flags = !state.flags;
+    ft.setAttribute("aria-pressed", String(state.flags));
+    restyle();
+  });
+  document.getElementById("issueSelect").addEventListener("change", e => {
+    loadIssue(e.target.value, false);
+  });
+
+  // ---------- boot ----------
+  applyTheme();
+  refreshIndex(true);
+  setInterval(() => refreshIndex(false), 60000);
+})();
+</script>
+</body>
+</html>

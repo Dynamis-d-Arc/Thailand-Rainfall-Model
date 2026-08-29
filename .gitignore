@@ -7,6 +7,9 @@ __pycache__/
 .ipynb_checkpoints/
 *.pyc
 
+# Dashboard data snapshots (regenerated from prediction CSVs)
+Dashboard/data/
+
 # Regenerable CV fold caches (multi-GB)
 ML_Model_V2/_th_cache/
 ML_Model_V2/_v3_cache/
