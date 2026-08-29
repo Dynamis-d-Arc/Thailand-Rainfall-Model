@@ -537,6 +537,37 @@ def phase_predict():
         f"max p: {out['p_h1_1.0mm'].max():.3f}")
     log(f"saved {path}")
 
+    # V9 health metric, live-proxy side. The labeled p(cold235>0 | rain) only moves with
+    # IMERG backfill; per run we log the cold-top picture unconditionally and among alert
+    # cells so a warm-rain regime shift is visible between backfills. IR column order is
+    # himawari_feature_names(): 2=tb_min_env_lag1, 4=cold235_env_lag1, 11=hw_valid.
+    env1, cold1, hw_valid = ir[:, 2], ir[:, 4], ir[:, 11] > 0
+    fl = out["flag_h1_1.0mm"].to_numpy() == 1
+    hrow = pd.DataFrame([{
+        "issue_local": str(issue),
+        "ir_valid_share": round(float(hw_valid.mean()), 4),
+        "cold235_share_all": round(float((cold1[hw_valid] > 0).mean()), 4)
+                             if hw_valid.any() else np.nan,
+        "cold235_share_flagged": round(float((cold1[hw_valid & fl] > 0).mean()), 4)
+                                 if (hw_valid & fl).any() else np.nan,
+        "n_flagged_h1_10": int(fl.sum()),
+        "tb_min_env_p10": round(float(np.nanpercentile(env1[hw_valid], 10)), 2)
+                          if hw_valid.any() else np.nan,
+        "tb_min_env_median": round(float(np.nanmedian(env1[hw_valid])), 2)
+                             if hw_valid.any() else np.nan,
+    }])
+    hpath = OUTPUT_DIR / "v10_health_log.csv"
+    if hpath.exists():
+        hlog = pd.read_csv(hpath)
+        hlog = pd.concat([hlog[hlog["issue_local"] != str(issue)], hrow], ignore_index=True)
+        hlog = hlog.sort_values("issue_local")
+    else:
+        hlog = hrow
+    hlog.to_csv(hpath, index=False)
+    log(f"health: cold-top share all={hrow['cold235_share_all'].iloc[0]} "
+        f"alert-cells={hrow['cold235_share_flagged'].iloc[0]} "
+        f"({len(hlog)} runs logged)")
+
 
 # %%
 if __name__ == "__main__":
