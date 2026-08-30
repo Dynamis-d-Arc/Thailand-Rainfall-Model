@@ -3,9 +3,7 @@
   "configurations": [
     {
       "name": "rainwatch",
-      "runtimeExecutable": ".venv\\Scripts\\python.exe",
-      "runtimeArgs": ["Dashboard\\rainwatch_server.py"],
-      "port": 8901
+      "url": "http://localhost:8901"
     }
   ]
 }

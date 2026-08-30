@@ -36,6 +36,8 @@ PREDICT_TIMEOUT = 25 * 60
 VERIFY_INTERVAL = 6 * 3600      # how often the IMERG verification loop wakes up
 VERIFY_TIMEOUT = 45 * 60
 VERIFY_MIN_AGE_H = 7            # IMERG Late Run latency margin passed to the verifier
+RETENTION_DAYS = 30             # raw hourly prediction CSVs older than this are pruned
+                                # (the verification/health logs keep the distilled record)
 
 P_COLS = ["p_h1_0.1mm", "p_h3_0.1mm", "p_h6_0.1mm",
           "p_h1_1.0mm", "p_h3_1.0mm", "p_h6_1.0mm"]
@@ -77,9 +79,27 @@ def csv_to_json(csv_path: Path, out_path: Path):
     atomic_write(out_path, json.dumps(payload, separators=(",", ":")))
 
 
+def prune_old():
+    cutoff = datetime.now() - timedelta(days=RETENTION_DAYS)
+    removed = 0
+    for p in PRED_DIR.glob("v10_predictions_*.csv"):
+        stamp = p.stem.replace("v10_predictions_", "")
+        try:
+            ts = datetime.strptime(stamp, "%Y%m%d_%H%M")
+        except ValueError:
+            continue
+        if ts < cutoff:
+            p.unlink()
+            (DATA / f"pred_{stamp}.json").unlink(missing_ok=True)
+            removed += 1
+    if removed:
+        log(f"pruned {removed} prediction snapshot(s) older than {RETENTION_DAYS} d")
+
+
 def convert_all():
     """Convert any new/updated prediction CSVs and rewrite the index."""
     DATA.mkdir(exist_ok=True)
+    prune_old()
     stamps = []
     for csv_path in sorted(PRED_DIR.glob("v10_predictions_*.csv")):
         stamp = csv_path.stem.replace("v10_predictions_", "")
@@ -288,7 +308,19 @@ def main():
                     help="serve existing predictions only, never call live APIs")
     ap.add_argument("--no-verify", action="store_true",
                     help="disable the IMERG verification loop")
+    ap.add_argument("--log-file", default=None,
+                    help="append output here instead of the console (required when "
+                         "run windowless via pythonw / Task Scheduler)")
     args = ap.parse_args()
+
+    if args.log_file:
+        lf = Path(args.log_file)
+        lf.parent.mkdir(parents=True, exist_ok=True)
+        if lf.exists() and lf.stat().st_size > 5_000_000:
+            lf.replace(lf.with_name(lf.name + ".1"))   # single rotation, ~5 MB
+        stream = open(lf, "a", encoding="utf-8", buffering=1)
+        sys.stdout = sys.stderr = stream
+        log("=== server start ===")
 
     stamps = convert_all()
     STATUS["predict_enabled"] = not args.no_predict

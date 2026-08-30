@@ -2,9 +2,24 @@
 
 Self-updating map of the V10 nationwide rain predictions.
 
-**Start it:** double-click `start_rainwatch.bat` (or run
-`.venv\Scripts\python.exe Dashboard\rainwatch_server.py` from the project root),
-then open http://localhost:8901.
+**It runs itself.** Two Windows scheduled tasks (registered 2026-08-30) keep the
+system alive with no manual steps:
+
+- **"Rainwatch Server"** — starts `rainwatch_server.py` (windowless, via
+  `pythonw`) at every logon and restarts it up to 10 times if it crashes.
+  Output goes to `Dashboard/data/server.log` (rotated at ~5 MB). Postgres is an
+  Automatic service, so the whole stack survives reboots.
+- **"Rainwatch Watchdog"** — `watchdog.py` hourly: raises a Windows toast
+  (via `notify.ps1`) when the newest prediction is >3 h old, verification
+  hasn't succeeded in >26 h, or status.json carries a standing error.
+  Debounced to one toast per problem per 6 h. `--test` sends a test toast.
+
+Manage both in Task Scheduler; `start_rainwatch.bat` remains for manual runs
+on a machine without the tasks (it will fail to bind port 8901 if the task's
+server is already running). Dashboard: http://localhost:8901.
+
+Raw hourly prediction CSVs are pruned after 30 days (`RETENTION_DAYS`); the
+verification and health logs keep the distilled record indefinitely.
 
 What the server does:
 
