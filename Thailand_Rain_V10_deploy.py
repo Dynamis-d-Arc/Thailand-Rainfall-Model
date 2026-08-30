@@ -528,6 +528,10 @@ def phase_predict():
         prob = d["calibrator"].predict(d["model"].predict_proba(x)[:, 1])
         out[f"p_{tname}"] = np.round(prob, 4)
         out[f"flag_{tname}"] = (prob >= d["threshold"]).astype(int)
+    # per-cell IR context so the verification loop can compute the labeled V9 health
+    # metric (cold235 at issue time joined against next-hour IMERG labels)
+    out["hw_cold235_env_lag1"] = np.round(ir[:, 4].astype(float), 4)
+    out["hw_valid"] = ir[:, 11].astype(int)
     stamp = pd.Timestamp(issue).strftime("%Y%m%d_%H%M")
     path = OUTPUT_DIR / f"v10_predictions_{stamp}.csv"
     out.to_csv(path, index=False)

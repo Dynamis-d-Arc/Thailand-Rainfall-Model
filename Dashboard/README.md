@@ -33,3 +33,23 @@ Two data sources feed it:
   `v10_health_log.csv` next to the prediction CSVs — unlabeled but immediate.
 
 The server merges both into `Dashboard/data/health.json` at every conversion.
+
+## IMERG verification loop
+
+`verify_imerg.py` closes the observation loop: every 6 h the server grades all
+mature predictions (issue + 6 h + 7 h IMERG-latency margin) against observed
+rain, using the exact training label — IMERG cell-max hourly rain
+(`precipitation_max_mm`, complete hours) ≥ threshold in ANY of the next h hours.
+
+Per run it tops up `"IMERG_THAILAND_DATA"` via the Earth Engine fetcher
+(idempotent), then appends per-(issue, target) scores — Brier, ROC-AUC, and the
+alert confusion (POD/FAR/CSI) — to `v10_verification_log.csv`, and extends the
+labeled V9 health metric from the per-cell `hw_cold235_env_lag1` column the
+predict phase now writes into each prediction CSV
+(`v10_health_labeled_live.csv`). The dashboard shows the rolling 14-day skill
+for the active layer ("Skill vs observed rain") and plots live-labeled months
+as hollow points on the IR-health chart.
+
+Issues whose labels haven't reached GEE yet simply stay pending and are retried
+next cycle. `--no-verify` disables the loop; `--no-predict` disables both loops.
+Requires the machine's persisted Earth Engine login (same as the backfills).

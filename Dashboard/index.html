@@ -213,6 +213,8 @@
   .stat .k { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
   .stat.wide { grid-column: 1 / -1; }
   .stat.wide .v { font-size: 14.5px; font-family: inherit; font-weight: 600; }
+  .stats.compact { grid-template-columns: repeat(3, 1fr); }
+  .stats.compact .v { font-size: 16.5px; }
 
   .hist { margin-top: 13px; }
   .hist-bars {
@@ -267,6 +269,7 @@
   }
   #healthChart .band { fill: var(--accent); fill-opacity: 0.10; }
   #healthChart .series { fill: none; stroke: var(--accent); stroke-width: 1.6; }
+  #healthChart .series.live { stroke-dasharray: 3 3; }
   #healthChart .lastlabel {
     font-family: "Spline Sans Mono", ui-monospace, monospace;
     font-size: 9px; font-weight: 600;
@@ -404,6 +407,19 @@
       (monthly; shaded band = 2024–25 range). Infrared cannot see warm shallow rain — below the
       band, expect the Himawari gain to shrink. Labeled months extend with IMERG backfill; the
       live proxy from each hourly run is unlabeled.</p>
+    </div>
+
+    <div class="panel" id="verifyPanel" hidden>
+      <p class="panel-label">Skill vs observed rain (IMERG)</p>
+      <div class="stats compact">
+        <div class="stat"><div class="v" id="vPod">—</div><div class="k">hit rate (POD)</div></div>
+        <div class="stat"><div class="v" id="vFar">—</div><div class="k">false alarms (FAR)</div></div>
+        <div class="stat"><div class="v" id="vCsi">—</div><div class="k">critical success</div></div>
+        <div class="stat"><div class="v" id="vRoc">—</div><div class="k">ROC-AUC</div></div>
+        <div class="stat"><div class="v" id="vBrier">—</div><div class="k">Brier score</div></div>
+        <div class="stat"><div class="v" id="vBase">—</div><div class="k">observed wet rate</div></div>
+      </div>
+      <p class="health-note" id="verifyFoot"></p>
     </div>
 
     <div class="panel">
@@ -608,6 +624,7 @@
       d.title = `${n} cells at p ≈ ${(b / NB).toFixed(2)}–${((b + 1) / NB).toFixed(2)}`;
       hb.appendChild(d);
     });
+    renderVerify();
   }
 
   // ---------- data loading ----------
@@ -678,6 +695,8 @@
       document.getElementById("issueSelect").value = latestStamp;
     }
     try { renderHealth(await fetchJson("data/health.json")); } catch (e) { /* optional */ }
+    try { VDATA = await fetchJson("data/verification.json"); renderVerify(); }
+    catch (e) { /* optional */ }
     try {
       const st = await fetchJson("data/status.json");
       if (!st.predict_enabled) setServerChip("warn", "auto-predict off");
@@ -710,16 +729,24 @@
       : p >= 0.72 ? ["--warn", "reduced — watch the gain"]
       : ["--err", "low — warm-rain regime"];
 
-    const last = hp.labeled[hp.labeled.length - 1];
+    // live-labeled months (from the IMERG verification loop) extend the canonical series
+    const liveMonths = (hp.labeled_live || [])
+      .filter(d => !hp.labeled.some(x => x.month === d.month));
+    const combined = hp.labeled.map(d => ({ ...d, live: false }))
+      .concat(liveMonths.map(d => ({ ...d, live: true })))
+      .sort((a, b) => monthSerial(a.month) - monthSerial(b.month));
+
+    const last = combined[combined.length - 1];
     const [sv, sl] = stateOf(last.p);
     document.getElementById("healthStatus").innerHTML =
       `<span class="dot" style="background:var(${sv})"></span>` +
-      `<span><b>${last.p.toFixed(2)}</b> in ${monthLabel(last.month)} — ${sl}` +
+      `<span><b>${last.p.toFixed(2)}</b> in ${monthLabel(last.month)}` +
+      `${last.live ? " (live-labeled)" : ""} — ${sl}` +
       (base ? ` (2024–25 mean ${base.mean.toFixed(2)})` : "") + `</span>`;
 
     // chart
     const W = 330, H = 130, ml = 30, mr = 10, mt = 10, mb = 20;
-    const pts = hp.labeled.map(d => ({ s: monthSerial(d.month), ...d }));
+    const pts = combined.map(d => ({ s: monthSerial(d.month), ...d }));
     const s0 = pts[0].s, s1 = pts[pts.length - 1].s || pts[0].s + 1;
     const ys = pts.map(p => p.p).concat(base ? [base.min, base.max] : []);
     const lo = Math.min(...ys) - 0.04, hi = Math.max(...ys) + 0.04;
@@ -741,15 +768,21 @@
         svg += `<text class="xtick" x="${X(p.s).toFixed(1)}" y="${H - 6}">${yr}</text>`;
       }
     });
-    let d = "", prev = null;
-    pts.forEach(p => {
-      d += (prev !== null && p.s - prev === 1 ? "L" : "M") + `${X(p.s).toFixed(1)},${Y(p.p).toFixed(1)}`;
-      prev = p.s;
-    });
-    svg += `<path class="series" d="${d}"/>`;
+    let dSolid = "", dLive = "";
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      if (b.s - a.s !== 1) continue;
+      const seg = `M${X(a.s).toFixed(1)},${Y(a.p).toFixed(1)}L${X(b.s).toFixed(1)},${Y(b.p).toFixed(1)}`;
+      if (a.live || b.live) dLive += seg; else dSolid += seg;
+    }
+    svg += `<path class="series" d="${dSolid}"/>`;
+    if (dLive) svg += `<path class="series live" d="${dLive}"/>`;
     pts.forEach((p, i) => {
-      svg += `<circle cx="${X(p.s).toFixed(1)}" cy="${Y(p.p).toFixed(1)}" r="2.6" style="fill:var(${stateOf(p.p)[0]})"/>` +
-             `<circle data-i="${i}" cx="${X(p.s).toFixed(1)}" cy="${Y(p.p).toFixed(1)}" r="8" style="fill:transparent"/>`;
+      const c = `var(${stateOf(p.p)[0]})`;
+      svg += p.live
+        ? `<circle cx="${X(p.s).toFixed(1)}" cy="${Y(p.p).toFixed(1)}" r="2.6" style="fill:var(--panel);stroke:${c};stroke-width:1.4"/>`
+        : `<circle cx="${X(p.s).toFixed(1)}" cy="${Y(p.p).toFixed(1)}" r="2.6" style="fill:${c}"/>`;
+      svg += `<circle data-i="${i}" cx="${X(p.s).toFixed(1)}" cy="${Y(p.p).toFixed(1)}" r="8" style="fill:transparent"/>`;
     });
     const lp = pts[pts.length - 1];
     svg += `<text class="lastlabel" x="${(X(lp.s) - 4).toFixed(1)}" y="${(Y(lp.p) - 6).toFixed(1)}" text-anchor="end">${lp.p.toFixed(2)}</text>`;
@@ -760,7 +793,8 @@
     chart.querySelectorAll("circle[data-i]").forEach(c => {
       c.addEventListener("mouseenter", () => {
         const p = pts[+c.dataset.i];
-        tip.innerHTML = `<b>${monthLabel(p.month)}</b> · p ${p.p.toFixed(3)} · ${p.wet_rows.toLocaleString()} wet rows`;
+        tip.innerHTML = `<b>${monthLabel(p.month)}</b> · p ${p.p.toFixed(3)} · ` +
+          `${p.wet_rows.toLocaleString()} wet rows${p.live ? " · live-labeled" : ""}`;
         tip.style.display = "block";
         const wrap = chart.parentElement, sc = wrap.clientWidth / W;
         let x = X(p.s) * sc + 10, y = Y(p.p) * (chart.clientHeight / H) - 12;
@@ -788,6 +822,41 @@
     } else {
       liveBox.innerHTML = `<span>live proxy: appears after the next hourly run</span>`;
     }
+  }
+
+  // ---------- verification vs IMERG ----------
+  let VDATA = null;
+  const activeTargetName = () => `h${[1, 3, 6][state.h]}_${["0.1", "1.0"][state.t]}mm`;
+
+  function renderVerify() {
+    const panel = document.getElementById("verifyPanel");
+    if (!VDATA || !Object.keys(VDATA.targets || {}).length) { panel.hidden = true; return; }
+    panel.hidden = false;
+    const t = VDATA.targets[activeTargetName()];
+    const set = (id, v, digits) => {
+      document.getElementById(id).textContent =
+        t && v != null ? v.toFixed(digits) : "—";
+    };
+    set("vPod", t && t.pod, 2);
+    set("vFar", t && t.far, 2);
+    set("vCsi", t && t.csi, 2);
+    set("vRoc", t && t.roc, 2);
+    set("vBrier", t && t.brier, 3);
+    document.getElementById("vBase").textContent =
+      t && t.base_rate != null ? (t.base_rate * 100).toFixed(0) + "%" : "—";
+    let foot;
+    if (!t) {
+      foot = "No scored issues for this layer yet.";
+    } else {
+      foot = `${t.issues} issue hour${t.issues === 1 ? "" : "s"} scored vs IMERG ` +
+        `(last ${VDATA.window_days} days) · latest ${t.last_issue}`;
+      if (t.provisional_share != null && t.provisional_share > 0.5)
+        foot += " · provisional Late Run labels";
+      if (VDATA.pending) foot += ` · ${VDATA.pending} awaiting labels`;
+      foot += ". POD = share of observed rain the alerts caught; FAR = share of alerts " +
+        "that were dry; Brier = probability error (lower is better).";
+    }
+    document.getElementById("verifyFoot").textContent = foot;
   }
 
   function setServerChip(kind, text) {

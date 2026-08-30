@@ -20,7 +20,7 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -33,6 +33,9 @@ V9_DIR = PROJ / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v9_2026_dec
 DATA = ROOT / "data"
 RUN_MINUTE = 10        # earliest minute past the hour to launch a predict run
 PREDICT_TIMEOUT = 25 * 60
+VERIFY_INTERVAL = 6 * 3600      # how often the IMERG verification loop wakes up
+VERIFY_TIMEOUT = 45 * 60
+VERIFY_MIN_AGE_H = 7            # IMERG Late Run latency margin passed to the verifier
 
 P_COLS = ["p_h1_0.1mm", "p_h3_0.1mm", "p_h6_0.1mm",
           "p_h1_1.0mm", "p_h3_1.0mm", "p_h6_1.0mm"]
@@ -40,7 +43,9 @@ F_COLS = [c.replace("p_", "flag_") for c in P_COLS]
 
 _status_lock = threading.Lock()
 STATUS = {"last_attempt": None, "last_success": None, "last_error": None,
-          "running": False, "run_minute": RUN_MINUTE, "predict_enabled": True}
+          "running": False, "run_minute": RUN_MINUTE, "predict_enabled": True,
+          "verify_last_attempt": None, "verify_last_success": None,
+          "verify_last_error": None, "verify_enabled": True}
 
 
 def log(msg):
@@ -90,6 +95,7 @@ def convert_all():
              "generated": datetime.now().isoformat(timespec="seconds")}
     atomic_write(DATA / "index.json", json.dumps(index))
     build_health()
+    build_verification(stamps)
     return stamps
 
 
@@ -121,7 +127,103 @@ def build_health():
             payload["live"] = json.loads(lg.to_json(orient="records"))
         except Exception as exc:
             log(f"health log read failed: {exc}")
+    # labeled-live: the verification loop's monthly p(cold-top | observed rain),
+    # computed from per-cell IR in the prediction CSVs joined against IMERG labels
+    lab_live = PRED_DIR / "v10_health_labeled_live.csv"
+    if lab_live.exists():
+        try:
+            df = pd.read_csv(lab_live, parse_dates=["issue_local"])
+            df["month"] = df["issue_local"].dt.strftime("%Y%m")
+            agg = df.groupby("month").apply(
+                lambda g: pd.Series({
+                    "p": (g["cold235_given_rain"] * g["wet_cells"]).sum()
+                         / g["wet_cells"].sum(),
+                    "wet_rows": g["wet_cells"].sum(),
+                }), include_groups=False)
+            payload["labeled_live"] = [
+                {"month": m, "p": round(float(r["p"]), 4), "wet_rows": int(r["wet_rows"])}
+                for m, r in agg.iterrows() if r["wet_rows"] >= 50]
+        except Exception as exc:
+            log(f"labeled-live health read failed: {exc}")
     atomic_write(DATA / "health.json", json.dumps(payload))
+
+
+def build_verification(stamps):
+    """data/verification.json — rolling scores of past predictions vs observed IMERG."""
+    payload = {"targets": {}, "window_days": 14, "pending": 0,
+               "updated": datetime.now().isoformat(timespec="seconds")}
+    vlog = PRED_DIR / "v10_verification_log.csv"
+    scored_stamps = set()
+    if vlog.exists():
+        try:
+            df = pd.read_csv(vlog, parse_dates=["issue_local"])
+            scored_stamps = {s for s, g in df.groupby("stamp") if len(g) >= 6}
+            recent = df[df["issue_local"] >= datetime.now() - timedelta(days=14)]
+            use = recent if len(recent) else df
+            for tgt, g in use.groupby("target"):
+                tp, fp, fn = int(g["tp"].sum()), int(g["fp"].sum()), int(g["fn"].sum())
+                roc = g["roc_auc"].dropna()
+                payload["targets"][tgt] = {
+                    "issues": int(len(g)),
+                    "brier": round(float((g["brier"] * g["n"]).sum() / g["n"].sum()), 4),
+                    "roc": round(float(roc.mean()), 4) if len(roc) else None,
+                    "pod": round(tp / (tp + fn), 3) if tp + fn else None,
+                    "far": round(fp / (tp + fp), 3) if tp + fp else None,
+                    "csi": round(tp / (tp + fp + fn), 3) if tp + fp + fn else None,
+                    "base_rate": round(float((g["base_rate"] * g["n"]).sum()
+                                             / g["n"].sum()), 4),
+                    "last_issue": str(g["issue_local"].max())[:16],
+                    "provisional_share": round(float(g["provisional_share"].mean()), 3)
+                                         if g["provisional_share"].notna().any() else None,
+                }
+        except Exception as exc:
+            log(f"verification log read failed: {exc}")
+    mature_cut = datetime.now() - timedelta(hours=6 + VERIFY_MIN_AGE_H)
+    for s in stamps:
+        try:
+            if datetime.strptime(s, "%Y%m%d_%H%M") <= mature_cut and s not in scored_stamps:
+                payload["pending"] += 1
+        except ValueError:
+            pass
+    atomic_write(DATA / "verification.json", json.dumps(payload))
+
+
+def run_verify():
+    with _status_lock:
+        STATUS["verify_last_attempt"] = datetime.now().isoformat(timespec="seconds")
+    save_status()
+    log("launching IMERG verification")
+    try:
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "verify_imerg.py"),
+             "--min-age-hours", str(VERIFY_MIN_AGE_H)],
+            cwd=str(PROJ), capture_output=True, text=True, timeout=VERIFY_TIMEOUT)
+        if result.returncode != 0:
+            tail = (result.stdout + result.stderr).strip()[-500:]
+            raise RuntimeError(f"verify exited {result.returncode}: {tail}")
+        summary = next((ln for ln in result.stdout.splitlines()
+                        if ln.startswith("VERIFY_SUMMARY")), "VERIFY_SUMMARY {}")
+        log(f"verification done: {summary.split(' ', 1)[1]}")
+        with _status_lock:
+            STATUS["verify_last_success"] = datetime.now().isoformat(timespec="seconds")
+            STATUS["verify_last_error"] = None
+    except Exception as exc:
+        with _status_lock:
+            STATUS["verify_last_error"] = f"{datetime.now():%Y-%m-%d %H:%M} {exc}"
+        log(f"verification FAILED: {exc}")
+    finally:
+        convert_all()
+        save_status()
+
+
+def verify_loop():
+    time.sleep(180)   # let the first predict/convert settle before hitting GEE
+    while True:
+        try:
+            run_verify()
+        except Exception as exc:
+            log(f"verify loop error: {exc}")
+        time.sleep(VERIFY_INTERVAL)
 
 
 def run_predict():
@@ -184,10 +286,13 @@ def main():
     ap.add_argument("--port", type=int, default=8901)
     ap.add_argument("--no-predict", action="store_true",
                     help="serve existing predictions only, never call live APIs")
+    ap.add_argument("--no-verify", action="store_true",
+                    help="disable the IMERG verification loop")
     args = ap.parse_args()
 
     stamps = convert_all()
     STATUS["predict_enabled"] = not args.no_predict
+    STATUS["verify_enabled"] = not (args.no_predict or args.no_verify)
     save_status()
     log(f"{len(stamps)} prediction snapshot(s) available"
         + (f", latest {stamps[-1]}" if stamps else ""))
@@ -198,6 +303,11 @@ def main():
         threading.Thread(target=predict_loop, daemon=True).start()
         log(f"predict loop armed: runs when no CSV exists for the current "
             f"hour and minute >= {RUN_MINUTE:02d}")
+    if STATUS["verify_enabled"]:
+        threading.Thread(target=verify_loop, daemon=True).start()
+        log(f"verify loop armed: IMERG scoring every {VERIFY_INTERVAL // 3600} h")
+    else:
+        log("verify loop disabled")
 
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     log(f"Rainwatch dashboard: http://localhost:{args.port}")
