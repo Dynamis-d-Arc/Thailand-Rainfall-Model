@@ -448,18 +448,30 @@
   const isDark = () => themeMode === "dark" || (themeMode === "auto" && sysDark.matches);
 
   // ---------- map ----------
+  const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/";
   const TILES = {
-    light: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-    dark: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    light: { base: ESRI + "World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+             labels: ESRI + "World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}" },
+    dark: { base: ESRI + "World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+            labels: ESRI + "World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}" },
   };
-  const ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+  const ATTR = 'Tiles &copy; Esri &mdash; &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
   const map = L.map("map", { zoomSnap: 0.25, attributionControl: true })
     .setView([13.5, 101.3], 6);
-  let tileLayer = null;
+  // place-name tiles render above the probability cells, below tooltips
+  map.createPane("labels");
+  map.getPane("labels").style.zIndex = 450;
+  map.getPane("labels").style.pointerEvents = "none";
+  let tileLayer = null, labelLayer = null;
   function setTiles() {
     if (tileLayer) map.removeLayer(tileLayer);
-    tileLayer = L.tileLayer(TILES[isDark() ? "dark" : "light"], {
+    if (labelLayer) map.removeLayer(labelLayer);
+    const t = TILES[isDark() ? "dark" : "light"];
+    tileLayer = L.tileLayer(t.base, {
       attribution: ATTR, maxZoom: 12, minZoom: 5,
+    }).addTo(map);
+    labelLayer = L.tileLayer(t.labels, {
+      maxZoom: 12, minZoom: 5, pane: "labels",
     }).addTo(map);
   }
   const canvas = L.canvas({ padding: 0.4 });
@@ -693,8 +705,8 @@
     const panel = document.getElementById("healthPanel");
     if (!hp || !hp.labeled || !hp.labeled.length) { panel.hidden = true; return; }
     panel.hidden = false;
-    const base = hp.baseline || { mean: 0.85, min: 0.78, max: 0.88 };
-    const stateOf = p => p >= base.min ? ["--ok", "in the healthy band"]
+    const base = hp.baseline;  // null if the V9 CSV had no 2024-25 months; never invented
+    const stateOf = p => base && p >= base.min ? ["--ok", "in the healthy band"]
       : p >= 0.72 ? ["--warn", "reduced — watch the gain"]
       : ["--err", "low — warm-rain regime"];
 
@@ -703,18 +715,20 @@
     document.getElementById("healthStatus").innerHTML =
       `<span class="dot" style="background:var(${sv})"></span>` +
       `<span><b>${last.p.toFixed(2)}</b> in ${monthLabel(last.month)} — ${sl}` +
-      ` (2024–25 mean ${base.mean.toFixed(2)})</span>`;
+      (base ? ` (2024–25 mean ${base.mean.toFixed(2)})` : "") + `</span>`;
 
     // chart
     const W = 330, H = 130, ml = 30, mr = 10, mt = 10, mb = 20;
     const pts = hp.labeled.map(d => ({ s: monthSerial(d.month), ...d }));
     const s0 = pts[0].s, s1 = pts[pts.length - 1].s || pts[0].s + 1;
-    const ys = pts.map(p => p.p).concat([base.min, base.max]);
+    const ys = pts.map(p => p.p).concat(base ? [base.min, base.max] : []);
     const lo = Math.min(...ys) - 0.04, hi = Math.max(...ys) + 0.04;
     const X = s => ml + (s - s0) / Math.max(1, s1 - s0) * (W - ml - mr);
     const Y = p => mt + (hi - p) / (hi - lo) * (H - mt - mb);
 
-    let svg = `<rect class="band" x="${ml}" y="${Y(base.max).toFixed(1)}" width="${W - ml - mr}" height="${(Y(base.min) - Y(base.max)).toFixed(1)}"/>`;
+    let svg = base
+      ? `<rect class="band" x="${ml}" y="${Y(base.max).toFixed(1)}" width="${W - ml - mr}" height="${(Y(base.min) - Y(base.max)).toFixed(1)}"/>`
+      : "";
     for (let t = Math.ceil(lo / 0.05) * 0.05; t <= hi + 1e-9; t += 0.05) {
       svg += `<line class="grid" x1="${ml}" y1="${Y(t).toFixed(1)}" x2="${W - mr}" y2="${Y(t).toFixed(1)}"/>` +
              `<text class="ytick" x="${ml - 4}" y="${(Y(t) + 2.5).toFixed(1)}" text-anchor="end">${t.toFixed(2)}</text>`;
