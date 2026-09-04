@@ -47,7 +47,8 @@ _status_lock = threading.Lock()
 STATUS = {"last_attempt": None, "last_success": None, "last_error": None,
           "running": False, "run_minute": RUN_MINUTE, "predict_enabled": True,
           "verify_last_attempt": None, "verify_last_success": None,
-          "verify_last_error": None, "verify_enabled": True}
+          "verify_last_error": None, "verify_enabled": True,
+          "started_at": datetime.now().isoformat(timespec="seconds")}
 
 
 def log(msg):
@@ -205,7 +206,34 @@ def build_verification(stamps):
                 payload["pending"] += 1
         except ValueError:
             pass
+    latest = imerg_frontier()
+    if latest is not None:
+        payload["imerg_latest"] = str(latest)[:16]
+        payload["imerg_lag_days"] = round(
+            (datetime.now() - latest).total_seconds() / 86400, 1)
     atomic_write(DATA / "verification.json", json.dumps(payload))
+
+
+def imerg_frontier():
+    """Newest complete-hour IMERG observation in the local table, or None."""
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host=os.getenv("PGHOST", "localhost"),
+            port=int(os.getenv("PGPORT", "5432")),
+            dbname=os.getenv("PGDATABASE", "postgres"),
+            user=os.getenv("PGUSER", "postgres"),
+            password=os.getenv("PGPASSWORD", "Pass1234"))
+        try:
+            with conn.cursor() as cur:
+                cur.execute('SELECT MAX(local_observation_time) '
+                            'FROM "IMERG_THAILAND_DATA" WHERE is_complete_hour')
+                return cur.fetchone()[0]
+        finally:
+            conn.close()
+    except Exception as exc:
+        log(f"imerg frontier check failed: {exc}")
+        return None
 
 
 def run_verify():

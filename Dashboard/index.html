@@ -856,6 +856,10 @@
       foot += ". POD = share of observed rain the alerts caught; FAR = share of alerts " +
         "that were dry; Brier = probability error (lower is better).";
     }
+    if (VDATA.imerg_lag_days != null && VDATA.imerg_lag_days > 2) {
+      foot += ` ⚠ IMERG feed is ${VDATA.imerg_lag_days.toFixed(1)} days behind ` +
+        `(newest observation ${VDATA.imerg_latest}) — scoring resumes when NASA catches up.`;
+    }
     document.getElementById("verifyFoot").textContent = foot;
   }
 
