@@ -19,5 +19,11 @@
     "OM features from live forecast API (models=ecmwf_ifs), 30 h of hourly history per cell for lags/rolling sums, neighbor aggregates over the 25 km grid",
     "Himawari B13 slots t-1..t-4 via NOAA S3 (segments/masks in _th_cache/himawari/fetch_config.json)",
     "hour_sin/cos, month_sin/cos from local (Asia/Bangkok) issue time"
-  ]
+  ],
+  "live_swap": {
+    "date": "2026-09-05 09:01",
+    "models": "V13 all-season (om_thailand_rain_v13_allseason)",
+    "previous": "backed up to deploy_v10_wet_only_backup/",
+    "reason": "dry-season training gap closed; IR gain +0.014-0.020 ROC in dry months (v13_dry_wet_report.csv)"
+  }
 }

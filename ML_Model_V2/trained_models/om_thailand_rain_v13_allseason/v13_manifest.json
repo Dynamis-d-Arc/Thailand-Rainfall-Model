@@ -1,0 +1,10 @@
+{
+  "built": "2026-09-05 07:34:45",
+  "config": "hw_allseason: V10 feature set, trained on ALL 13 blocks after the dry-season Himawari backfill (previously 7 wet-season blocks only)",
+  "supersedes": "om_thailand_rain_v10_deploy/deploy (wet-season-only training)",
+  "thresholds_from": "out-of-fold hw_allseason probabilities, all folds",
+  "library_versions": {
+    "sklearn": "1.9.0",
+    "lightgbm": "4.7.0"
+  }
+}
