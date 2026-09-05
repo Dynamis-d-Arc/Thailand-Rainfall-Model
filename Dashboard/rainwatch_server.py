@@ -303,6 +303,10 @@ def run_predict():
 
 
 def predict_loop():
+    # Escalating cool-down after consecutive failures: a rate-limited or blocked
+    # upstream API (Open-Meteo escalated 429s to connection refusals on 2026-09-05
+    # after ~10-minutely retry storms) recovers faster when we stop hammering it.
+    fail_streak = 0
     while True:
         try:
             now = datetime.now()
@@ -310,6 +314,16 @@ def predict_loop():
             have = (PRED_DIR / f"v10_predictions_{want}.csv").exists()
             if now.minute >= RUN_MINUTE and not have:
                 run_predict()
+                with _status_lock:
+                    failed = STATUS["last_error"] is not None
+                if failed:
+                    fail_streak += 1
+                    cooldown = min(3600, 600 * fail_streak)
+                    log(f"predict failed ({fail_streak} in a row); "
+                        f"cooling down {cooldown // 60} min")
+                    time.sleep(cooldown)
+                else:
+                    fail_streak = 0
         except Exception as exc:
             log(f"predict loop error: {exc}")
         time.sleep(60)

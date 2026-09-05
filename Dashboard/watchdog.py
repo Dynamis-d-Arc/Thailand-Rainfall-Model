@@ -63,8 +63,10 @@ def toast(title, message):
 def server_status():
     """Live status.json over HTTP, or None when the server is unreachable."""
     try:
+        # generous timeout: heavy local training can starve the server for seconds
+        # without it being down (a 5s probe false-alarmed during a 13-fold CV)
         with urllib.request.urlopen(
-                "http://localhost:8901/data/status.json", timeout=5) as r:
+                "http://localhost:8901/data/status.json", timeout=30) as r:
             return json.loads(r.read().decode("utf-8"))
     except Exception:
         return None
