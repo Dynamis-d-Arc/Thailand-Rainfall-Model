@@ -322,6 +322,151 @@ def phase_screen():
     log(f"GO RULE: {GO_RULE}")
 
 
+# %% [markdown]
+# ## Phases `build` / `cv` / `report` — the full experiment (B07 only, per the pilot)
+#
+# `build` mirrors V7's build_features: hour-aligned stat series for B07 (mb_ day files)
+# and B13 (V7 day files), derived per-hour features, then per-row extraction. The block
+# is deliberately small — the screen validated the lag-1 mean BTD; trends and the env
+# variant ride along. `cv` runs the V7 protocol over all 13 blocks for config `hw_b07`
+# (weather + B13 block + B07 block); `report` scores it against `hw_allseason` OOF on
+# identical rows, sliced by regime — the warm slice (no cold top anywhere) is the
+# pre-registered readout, since that is the rain B13 cannot see.
+
+# %%
+def b07_feature_names():
+    return ["b07_tb_mean_lag1", "b07_tb_min_env_lag1",
+            "btd_07_13_mean_lag1", "btd_07_13_envmin_lag1",
+            "btd_07_13_mean_lag2", "btd_07_13_mean_drop3", "b07_valid"]
+
+
+def load_mb_series(band):
+    """(hours_utc, stats) hour-aligned arrays from a band's day files."""
+    hours, stats = [], []
+    for f in sorted(band_dir(band).glob("day_*.npz")):
+        z = np.load(f)
+        hours.append(z["hours"])
+        stats.append(z["stats"])
+    return np.concatenate(hours), np.concatenate(stats).astype("float32")
+
+
+def phase_build():
+    from Thailand_Rain_V7_himawari_ir import load_stat_series, shift_down, STAT_NAMES
+    # B13: V7's series (local-hour aligned). B07: UTC day files -> convert to local.
+    hours13_local, s13 = load_stat_series()
+    hours07_utc, s07 = load_mb_series("B07")
+    hours07_local = hours07_utc + np.timedelta64(UTC_OFFSET_HOURS, "h")
+    log(f"B13 series {s13.shape}; B07 series {s07.shape}, "
+        f"finite {np.isfinite(s07[..., 0]).mean():.1%}")
+
+    # align B07 onto the B13 hour axis
+    pos = {np.datetime64(h): i for i, h in enumerate(hours07_local)}
+    idx = np.array([pos.get(np.datetime64(h), -1) for h in hours13_local])
+    b07 = np.full((len(hours13_local), s07.shape[1], s07.shape[2]), np.nan, "float32")
+    have = idx >= 0
+    b07[have] = s07[idx[have]]
+    log(f"aligned: {have.mean():.1%} of {len(hours13_local):,} panel hours have B07")
+    del s07
+
+    MEAN, ENVMIN = MB_STAT_NAMES.index("tb_mean"), MB_STAT_NAMES.index("tb_min_env")
+    b13_mean, b13_envmin = s13[..., STAT_NAMES.index("tb_mean")], \
+        s13[..., STAT_NAMES.index("tb_min_env")]
+    btd_mean = b07[..., MEAN] - b13_mean
+    btd_envmin = b07[..., ENVMIN] - b13_envmin
+    with np.errstate(all="ignore"):
+        m1, m2, m3 = (shift_down(btd_mean, k) for k in (1, 2, 3))
+        hourly = np.stack([
+            shift_down(b07[..., MEAN], 1), shift_down(b07[..., ENVMIN], 1),
+            m1, shift_down(btd_envmin, 1),
+            m2, m3 - m1,
+            np.isfinite(shift_down(b07[..., MEAN], 1)).astype("float32"),
+        ], axis=-1).astype("float32")
+    del b07, btd_mean, btd_envmin
+
+    import pandas as _pd
+    from Thailand_Rain_V7_himawari_ir import load_grid
+    grid = load_grid()
+    unit = np.load(CACHE / "unit_id.npy")
+    tf = np.load(CACHE / "forecast_time.npy")
+    hour_pos = {np.datetime64(h): i for i, h in enumerate(hours13_local)}
+    cell_pos = {g: i for i, g in enumerate(grid["grid_number"])}
+    row_hour = np.array([hour_pos.get(np.datetime64(t), -1) for t in tf])
+    row_cell = np.array([cell_pos[int(g)] for g in unit])
+    outside = row_hour < 0
+    row_hour[outside] = 0
+    block = hourly[row_hour, row_cell]
+    block[outside] = np.nan
+    block[outside, -1] = 0.0
+    np.save(CACHE / "b07_block.npy", block)
+    share = _pd.Series(np.isnan(block).mean(axis=0), index=b07_feature_names())
+    log(f"b07_block {block.shape}, NaN share:")
+    print(share.round(4).to_string())
+
+
+def phase_cv():
+    import Thailand_Rain_V3 as v3
+    from Thailand_Rain_V7_himawari_ir import himawari_feature_names
+    v3.CONFIG_BLOCKS["hw_b07"] = [("hw_block_offset0.npy", himawari_feature_names),
+                                  ("b07_block.npy", b07_feature_names)]
+    y = np.load(CACHE / "y.npy")
+    tf = np.load(CACHE / "forecast_time.npy")
+    fold_key = v3.block_keys(tf)
+    folds = [int(v) for v in np.unique(fold_key)
+             if (fold_key == v).sum() >= v3.MIN_FOLD_ROWS]
+    log(f"hw_b07 CV over {len(folds)} folds")
+    results, fit_log = v3.run_cv("hw_b07", y, tf, fold_key, folds)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(results).to_csv(OUTPUT_DIR / "v12_cv_results.csv", index=False)
+    pd.DataFrame(fit_log).to_csv(OUTPUT_DIR / "v12_fit_log.csv", index=False)
+
+
+def phase_report():
+    from sklearn.metrics import average_precision_score, roc_auc_score
+    from Thailand_Rain_V7_himawari_ir import himawari_feature_names
+    y = np.load(CACHE / "y.npy")
+    tf = np.load(CACHE / "forecast_time.npy")
+    hw = np.load(CACHE / "hw_block_offset0.npy", mmap_mode="r")
+    cold = np.asarray(hw[:, himawari_feature_names().index("hw_cold235_env_lag1")])
+    del hw
+    base_oof = np.load(CACHE / "oof_cal_hw_allseason.npy")
+    new_oof = np.load(CACHE / "oof_cal_hw_b07.npy")
+
+    months = pd.DatetimeIndex(tf).month.to_numpy()
+    years = pd.DatetimeIndex(tf).year.to_numpy()
+    wet = np.isin(months, [5, 6, 7, 8, 9, 10])
+    slices = {
+        "ALL": np.ones(len(y), bool),
+        "WET": wet,
+        "DRY": ~wet,
+        "WARM (no cold top)": np.isfinite(cold) & (cold == 0),
+        "2026 MAY-JUL": (years == 2026) & np.isin(months, [5, 6, 7]),
+    }
+    rows = []
+    for sname, sm in slices.items():
+        for i, name in enumerate(TARGET_NAMES):
+            m = sm & np.isfinite(base_oof[:, i]) & np.isfinite(new_oof[:, i])
+            if m.sum() < 5000 or len(np.unique(y[m, i])) < 2:
+                continue
+            yy = y[m, i]
+            rows.append({
+                "slice": sname, "target": name, "rows": int(m.sum()),
+                "base_rate": round(float(yy.mean()), 4),
+                "hw_roc": round(float(roc_auc_score(yy, base_oof[m, i])), 4),
+                "b07_roc": round(float(roc_auc_score(yy, new_oof[m, i])), 4),
+                "hw_pr": round(float(average_precision_score(yy, base_oof[m, i])), 4),
+                "b07_pr": round(float(average_precision_score(yy, new_oof[m, i])), 4),
+            })
+    out = pd.DataFrame(rows)
+    out["roc_gain"] = (out["b07_roc"] - out["hw_roc"]).round(4)
+    out["pr_gain"] = (out["b07_pr"] - out["hw_pr"]).round(4)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out.to_csv(OUTPUT_DIR / "v12_report.csv", index=False)
+    log("=== hw_b07 vs hw_allseason on identical rows ===")
+    print(out[["slice", "target", "rows", "base_rate", "hw_roc", "b07_roc",
+               "roc_gain", "pr_gain"]].to_string(index=False))
+    log(f"saved {OUTPUT_DIR / 'v12_report.csv'}")
+
+
 # %%
 if __name__ == "__main__":
     phase = sys.argv[1] if len(sys.argv) > 1 else "screen"
@@ -334,6 +479,12 @@ if __name__ == "__main__":
         phase_fetch(band, start, end)
     elif phase == "screen":
         phase_screen()
+    elif phase == "build":
+        phase_build()
+    elif phase == "cv":
+        phase_cv()
+    elif phase == "report":
+        phase_report()
     else:
         raise SystemExit(f"unknown phase {phase!r}")
     log(f"phase {phase} done in {(time.time() - t0) / 60:.1f} min")
