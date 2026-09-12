@@ -65,6 +65,26 @@ predict phase now writes into each prediction CSV
 for the active layer ("Skill vs observed rain") and plots live-labeled months
 as hollow points on the IR-health chart.
 
+The same run also scores two reference forecasts on exactly the same (issue,
+target, cells) and appends them to `v10_baseline_log.csv`, so the model's live
+numbers read as a lift rather than a bare score:
+
+- **persistence** — the last h observed hours ending at issue time (IMERG
+  cell-max in mm; flag = "≥ threshold now"). It uses observed rain *at issue
+  time*, which the live model never has (IMERG latency 4 h+), so it is the
+  observation ceiling, not a competitor. It beats the model at +1 h and loses by
+  +6 h.
+- **climatology** — the cell's observed label frequency for this calendar month
+  and hour of day (±1 h pooled) from IMERG 2024-07..2026-07, flagged at the
+  deployed model's own probability threshold. The no-skill floor. Built once by
+  `build_climatology.py` into `v10_climatology.csv.gz`; rebuild after a major
+  IMERG backfill.
+
+The "Skill vs observed rain" panel shows a model / persistence / climatology
+table for the active layer; a reference cell is green where the model beats
+it and red where it does not. Baselines for issues scored before the log
+existed are backfilled automatically on the next cycle.
+
 Issues whose labels haven't reached GEE yet simply stay pending and are retried
 next cycle. `--no-verify` disables the loop; `--no-predict` disables both loops.
 Requires the machine's persisted Earth Engine login (same as the backfills).

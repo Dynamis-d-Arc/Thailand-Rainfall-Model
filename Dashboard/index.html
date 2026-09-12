@@ -216,6 +216,24 @@
   .stats.compact { grid-template-columns: repeat(3, 1fr); }
   .stats.compact .v { font-size: 16.5px; }
 
+  .skill-table {
+    border-collapse: collapse; width: 100%; margin-top: 12px;
+    font-family: "Spline Sans Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums; font-size: 12px;
+  }
+  .skill-table th {
+    font-family: "Schibsted Grotesk", sans-serif; font-weight: 500; font-size: 11px;
+    color: var(--muted); text-align: right; padding: 0 0 4px 10px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .skill-table th:first-child, .skill-table td:first-child { text-align: left; padding-left: 0; }
+  .skill-table td { text-align: right; padding: 4px 0 3px 10px; color: var(--ink-2); }
+  .skill-table td:first-child { font-family: "Schibsted Grotesk", sans-serif; color: var(--muted); }
+  .skill-table tr.model td { color: var(--ink); font-weight: 600; }
+  .skill-table tr.model td:first-child { color: var(--ink); }
+  .skill-table td.best { color: var(--ok); }
+  .skill-table td.worse { color: var(--err); }
+
   .hist { margin-top: 13px; }
   .hist-bars {
     display: flex; align-items: flex-end; gap: 1px;
@@ -419,6 +437,10 @@
         <div class="stat"><div class="v" id="vBrier">—</div><div class="k">Brier score</div></div>
         <div class="stat"><div class="v" id="vBase">—</div><div class="k">observed wet rate</div></div>
       </div>
+      <table class="skill-table" id="vTable" hidden aria-label="Model skill against reference forecasts">
+        <thead><tr><th>forecaster</th><th>POD</th><th>FAR</th><th>CSI</th><th>ROC</th><th>Brier</th></tr></thead>
+        <tbody id="vTableBody"></tbody>
+      </table>
       <p class="health-note" id="verifyFoot"></p>
     </div>
 
@@ -844,6 +866,7 @@
     set("vBrier", t && t.brier, 3);
     document.getElementById("vBase").textContent =
       t && t.base_rate != null ? (t.base_rate * 100).toFixed(0) + "%" : "—";
+    renderSkillTable(t);
     let foot;
     if (!t) {
       foot = "No scored issues for this layer yet.";
@@ -855,12 +878,43 @@
       if (VDATA.pending) foot += ` · ${VDATA.pending} awaiting labels`;
       foot += ". POD = share of observed rain the alerts caught; FAR = share of alerts " +
         "that were dry; Brier = probability error (lower is better).";
+      if (t.baselines)
+        foot += " Persistence = \"raining now, so it will rain\" using observed IMERG at " +
+          "issue time (which the live model never has); climatology = the cell's usual " +
+          "wet frequency for this month and hour, flagged at the model's own threshold.";
     }
     if (VDATA.imerg_lag_days != null && VDATA.imerg_lag_days > 2) {
       foot += ` ⚠ IMERG feed is ${VDATA.imerg_lag_days.toFixed(1)} days behind ` +
         `(newest observation ${VDATA.imerg_latest}) — scoring resumes when NASA catches up.`;
     }
     document.getElementById("verifyFoot").textContent = foot;
+  }
+
+  // model vs reference forecasts on the same scored issues; hidden until the
+  // baseline log has rows for this target
+  function renderSkillTable(t) {
+    const table = document.getElementById("vTable");
+    const body = document.getElementById("vTableBody");
+    const b = t && t.baselines;
+    if (!b || !Object.keys(b).length) { table.hidden = true; body.innerHTML = ""; return; }
+    const cols = [["pod", 2, +1], ["far", 2, -1], ["csi", 2, +1], ["roc", 2, +1], ["brier", 3, -1]];
+    const rows = [["model", t], ["persistence", b.persistence], ["climatology", b.climatology]]
+      .filter(([, r]) => r);
+    const fmt = (v, d) => (v == null ? "—" : v.toFixed(d));
+    body.innerHTML = rows.map(([label, r]) => {
+      const cells = cols.map(([k, d, sign]) => {
+        let cls = "";
+        if (label !== "model" && r[k] != null && t[k] != null) {
+          // colour the reference by whether the model beats it on this metric
+          const diff = (t[k] - r[k]) * sign;
+          cls = diff > 0.005 ? " class=\"best\"" : diff < -0.005 ? " class=\"worse\"" : "";
+        }
+        return `<td${cls}>${fmt(r[k], d)}</td>`;
+      }).join("");
+      const name = label === "model" ? "model" : label;
+      return `<tr class="${label}"><td>${name}</td>${cells}</tr>`;
+    }).join("");
+    table.hidden = false;
   }
 
   function setServerChip(kind, text) {

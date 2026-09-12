@@ -174,23 +174,32 @@ def build_verification(stamps):
     payload = {"targets": {}, "window_days": 14, "pending": 0,
                "updated": datetime.now().isoformat(timespec="seconds")}
     vlog = PRED_DIR / "v10_verification_log.csv"
+    blog = PRED_DIR / "v10_baseline_log.csv"
     scored_stamps = set()
+    window_start = datetime.now() - timedelta(days=14)
+
+    def skill(g):
+        """Pooled confusion + mean per-issue ROC + n-weighted Brier over a log slice."""
+        tp, fp, fn = int(g["tp"].sum()), int(g["fp"].sum()), int(g["fn"].sum())
+        roc = g["roc_auc"].dropna()
+        return {
+            "issues": int(len(g)),
+            "brier": round(float((g["brier"] * g["n"]).sum() / g["n"].sum()), 4),
+            "roc": round(float(roc.mean()), 4) if len(roc) else None,
+            "pod": round(tp / (tp + fn), 3) if tp + fn else None,
+            "far": round(fp / (tp + fp), 3) if tp + fp else None,
+            "csi": round(tp / (tp + fp + fn), 3) if tp + fp + fn else None,
+        }
+
     if vlog.exists():
         try:
             df = pd.read_csv(vlog, parse_dates=["issue_local"])
             scored_stamps = {s for s, g in df.groupby("stamp") if len(g) >= 6}
-            recent = df[df["issue_local"] >= datetime.now() - timedelta(days=14)]
+            recent = df[df["issue_local"] >= window_start]
             use = recent if len(recent) else df
             for tgt, g in use.groupby("target"):
-                tp, fp, fn = int(g["tp"].sum()), int(g["fp"].sum()), int(g["fn"].sum())
-                roc = g["roc_auc"].dropna()
                 payload["targets"][tgt] = {
-                    "issues": int(len(g)),
-                    "brier": round(float((g["brier"] * g["n"]).sum() / g["n"].sum()), 4),
-                    "roc": round(float(roc.mean()), 4) if len(roc) else None,
-                    "pod": round(tp / (tp + fn), 3) if tp + fn else None,
-                    "far": round(fp / (tp + fp), 3) if tp + fp else None,
-                    "csi": round(tp / (tp + fp + fn), 3) if tp + fp + fn else None,
+                    **skill(g),
                     "base_rate": round(float((g["base_rate"] * g["n"]).sum()
                                              / g["n"].sum()), 4),
                     "last_issue": str(g["issue_local"].max())[:16],
@@ -199,6 +208,18 @@ def build_verification(stamps):
                 }
         except Exception as exc:
             log(f"verification log read failed: {exc}")
+    if blog.exists() and payload["targets"]:
+        # reference forecasts (persistence / climatology) scored by verify_imerg.py on
+        # the same issues; restricted to the stamps the model table above was built from
+        try:
+            bdf = pd.read_csv(blog, parse_dates=["issue_local"])
+            brecent = bdf[bdf["issue_local"] >= window_start]
+            buse = brecent if len(brecent) else bdf
+            for (tgt, name), g in buse.groupby(["target", "baseline"]):
+                if tgt in payload["targets"]:
+                    payload["targets"][tgt].setdefault("baselines", {})[name] = skill(g)
+        except Exception as exc:
+            log(f"baseline log read failed: {exc}")
     mature_cut = datetime.now() - timedelta(hours=6 + VERIFY_MIN_AGE_H)
     for s in stamps:
         try:
