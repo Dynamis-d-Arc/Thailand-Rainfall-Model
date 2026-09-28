@@ -12,11 +12,17 @@ name: hourly-predict
 
 on:
   schedule:
-    # Every hour at :10 UTC. GitHub queues cron on a best-effort basis and can
-    # delay or drop runs under load, so treat this as "most hours", not all.
+    # :37, deliberately not near the top of the hour. GitHub queues cron on a
+    # best-effort basis and its docs name the start of every hour as peak load;
+    # at '10 * * * *' this workflow missed three consecutive slots (09:10, 10:10
+    # and 11:10 UTC on 2026-09-28) without ever firing once.
     # The script picks its own issue hour (latest complete Asia/Bangkok hour)
     # from the Open-Meteo response, so drift in launch time is harmless.
-    - cron: '10 * * * *'
+    #
+    # A cloud routine ("Rainwatch hourly-predict keeper") checks at :50 and
+    # dispatches this workflow if no run exists for the hour, so a missed cron
+    # slot is covered rather than lost. Keep that check AFTER this minute.
+    - cron: '37 * * * *'
   workflow_dispatch:
 
 concurrency:
