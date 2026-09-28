@@ -449,27 +449,42 @@ def phase_parity():
 
 # %%
 def fetch_live_om(grid, batch_size=50, sleep_s=1.0, retries=6):
+    """Pull the 24 h ecmwf_ifs history the OM features need, 50 cells per call.
+
+    Retries cover two different failures. HTTP 429 gets a long, escalating
+    cool-down because Open-Meteo escalated to outright connection refusals on
+    2026-09-05 after retry storms. A read timeout or dropped connection gets a
+    short one - it is usually a one-off blip, and backing off for minutes only
+    risks running out the clock. Previously only 429 was retried, so a single
+    transient timeout aborted the whole run; on an hourly schedule that is a
+    permanently missing hour.
+    """
     import requests
     frames = []
     points = grid.to_dict("records")
     for lo in range(0, len(points), batch_size):
         batch = points[lo:lo + batch_size]
+        n = lo // batch_size + 1
+        payloads = None
         for attempt in range(1, retries + 1):
-            resp = requests.get("https://api.open-meteo.com/v1/forecast", params={
-                "latitude": ",".join(str(p["latitude"]) for p in batch),
-                "longitude": ",".join(str(p["longitude"]) for p in batch),
-                "hourly": ",".join(RAW_VARS), "models": "ecmwf_ifs",
-                "past_days": 2, "forecast_days": 1, "timezone": "Asia/Bangkok",
-            }, timeout=120)
-            if resp.status_code == 429 and attempt < retries:
-                wait = min(60 * attempt, 300)
-                log(f"  batch {lo // batch_size + 1}: rate-limited, retrying in {wait}s "
-                    f"({attempt}/{retries})")
+            try:
+                resp = requests.get("https://api.open-meteo.com/v1/forecast", params={
+                    "latitude": ",".join(str(p["latitude"]) for p in batch),
+                    "longitude": ",".join(str(p["longitude"]) for p in batch),
+                    "hourly": ",".join(RAW_VARS), "models": "ecmwf_ifs",
+                    "past_days": 2, "forecast_days": 1, "timezone": "Asia/Bangkok",
+                }, timeout=120)
+                resp.raise_for_status()
+                payloads = resp.json()
+                break
+            except requests.exceptions.RequestException as exc:
+                if attempt == retries:
+                    raise
+                throttled = getattr(getattr(exc, "response", None), "status_code", None) == 429
+                wait = min(60 * attempt, 300) if throttled else min(10 * attempt, 60)
+                why = "rate-limited" if throttled else type(exc).__name__
+                log(f"  batch {n}: {why}, retrying in {wait}s ({attempt}/{retries})")
                 time.sleep(wait)
-                continue
-            resp.raise_for_status()
-            break
-        payloads = resp.json()
         if isinstance(payloads, dict):
             payloads = [payloads]
         for p, pl in zip(batch, payloads):
