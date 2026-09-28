@@ -12,17 +12,21 @@ name: hourly-predict
 
 on:
   schedule:
-    # :37, deliberately not near the top of the hour. GitHub queues cron on a
-    # best-effort basis and its docs name the start of every hour as peak load;
-    # at '10 * * * *' this workflow missed three consecutive slots (09:10, 10:10
-    # and 11:10 UTC on 2026-09-28) without ever firing once.
-    # The script picks its own issue hour (latest complete Asia/Bangkok hour)
-    # from the Open-Meteo response, so drift in launch time is harmless.
+    # Kept for the day GitHub's scheduler starts working - as of 2026-09-28 it
+    # never has, missing every slot at both ':10' and ':37' since the workflow
+    # was registered. The cloud routine below is what actually drives this.
     #
-    # A cloud routine ("Rainwatch hourly-predict keeper") checks at :50 and
-    # dispatches this workflow if no run exists for the hour, so a missed cron
-    # slot is covered rather than lost. Keep that check AFTER this minute.
-    - cron: '37 * * * *'
+    # Minute matters for a reason that is easy to miss: Asia/Bangkok is UTC+7,
+    # a whole-hour offset, so UTC and local minutes are IDENTICAL. A run launched
+    # late in the hour crosses the local hour boundary while it fetches, and the
+    # script then picks the NEXT issue hour (it uses the latest complete local
+    # hour). At ':50' that skipped 19:00 entirely and produced 20:00 twice.
+    # Launching mid-hour keeps one run mapped to exactly one issue hour.
+    #
+    # The routine ("Rainwatch hourly-predict keeper") checks at :25 and
+    # dispatches only if no run exists for the current UTC hour, so keep this
+    # minute BEFORE :25 and a working cron will win the race.
+    - cron: '15 * * * *'
   workflow_dispatch:
 
 concurrency:

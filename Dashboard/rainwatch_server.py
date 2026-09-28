@@ -296,7 +296,11 @@ def sync_predictions():
         STATUS["sync_last_attempt"] = datetime.now().isoformat(timespec="seconds")
 
     ref = f"refs/remotes/origin/{PRED_BRANCH}"
-    r = _git("fetch", "--depth", "1", "origin", f"{PRED_BRANCH}:{ref}")
+    # --force is required, not cosmetic. A --depth 1 fetch grafts a parentless
+    # commit, so the next one is not a descendant of the last in this repo's view
+    # and git rejects the ref update as non-fast-forward. Without it the tracking
+    # ref freezes at the first snapshot ever fetched and every later sync fails.
+    r = _git("fetch", "--force", "--depth", "1", "origin", f"{PRED_BRANCH}:{ref}")
     if r.returncode != 0:
         raise RuntimeError("fetch failed: "
                            + r.stderr.decode(errors="replace").strip()[-300:])
