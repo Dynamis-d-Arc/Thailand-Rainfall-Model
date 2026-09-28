@@ -5,6 +5,7 @@ Checks that the system is actually alive and raises a Windows toast when it is n
  - newest prediction CSV older than PRED_STALE_H (with a startup grace period, so a
    machine waking from overnight sleep is not flagged while the server catches up)
  - last successful IMERG verification older than VERIFY_STALE_H
+ - last successful pull of cloud predictions older than SYNC_STALE_H
  - status.json carrying a standing predict/verify error
  - the IMERG source feed itself more than IMERG_LAG_ALERT_D days behind (NASA/GEE
    ingestion stalls happen; verification pauses until it resumes)
@@ -32,6 +33,8 @@ WLOG = ROOT / "data" / "watchdog.log"
 
 PRED_STALE_H = 3
 VERIFY_STALE_H = 26
+SYNC_STALE_H = 3         # cloud-prediction pull runs every 10 min, so hours of
+                         # silence means the pull is genuinely broken
 IMERG_LAG_ALERT_D = 3    # toast when the IMERG source feed falls this many days behind
 DEBOUNCE_H = {"default": 6, "imerg_lag": 24}   # a stalled feed re-alerts daily, not 4x/day
 STARTUP_GRACE_MIN = 30   # server started this recently -> skip staleness checks
@@ -160,6 +163,19 @@ def find_problems():
         if status.get("verify_last_error"):
             problems["verify_error"] = \
                 f"Verify error: {str(status['verify_last_error'])[:120]}"
+    if status.get("sync_enabled"):
+        # Staleness only, deliberately not sync_last_error on its own: the
+        # sync loop runs every 10 min, so a transient network blip is normal
+        # and would otherwise toast constantly. Hours without a success is
+        # the real signal.
+        ok = status.get("sync_last_success")
+        if ok and not in_grace:
+            since = datetime.now() - datetime.fromisoformat(ok)
+            if since > timedelta(hours=SYNC_STALE_H):
+                problems["stale_sync"] = (
+                    f"No successful pull of cloud predictions for "
+                    f"{since.total_seconds() / 3600:.0f} h: "
+                    f"{str(status.get('sync_last_error'))[:100]}")
     return problems
 
 

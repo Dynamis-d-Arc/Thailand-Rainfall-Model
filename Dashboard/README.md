@@ -11,7 +11,8 @@ system alive with no manual steps:
   Automatic service, so the whole stack survives reboots.
 - **"Rainwatch Watchdog"** — `watchdog.py` hourly: raises a Windows toast
   (via `notify.ps1`) when the newest prediction is >3 h old, verification
-  hasn't succeeded in >26 h, or status.json carries a standing error.
+  hasn't succeeded in >26 h, the cloud-prediction pull hasn't succeeded in
+  >3 h, or status.json carries a standing error.
   Debounced to one toast per problem per 6 h. `--test` sends a test toast.
 
 Manage both in Task Scheduler; `start_rainwatch.bat` remains for manual runs
@@ -31,8 +32,33 @@ What the server does:
   `Thailand_Rain_V10_deploy.py predict` and converts the result into
   `Dashboard/data/` (gitignored, regenerable). The page polls every 60 s and
   picks up new predictions automatically; it warns when the newest data is stale.
+- Every 10 minutes it pulls any prediction CSVs the GitHub Actions job has
+  published to the `predictions` branch (see below) and converts them like
+  local ones. This is what fills in the hours the machine spent asleep.
 - `--no-predict` serves existing snapshots without touching the live APIs
-  (useful offline or when Open-Meteo is rate-limiting); `--port` changes the port.
+  (useful offline or when Open-Meteo is rate-limiting); `--no-sync` disables
+  the pull; `--port` changes the port. `--no-predict` with sync left on turns
+  the dashboard into a pure viewer of cloud-produced predictions.
+
+## Cloud predictions
+
+This machine sleeps (Windows Modern Standby), which used to cost 10-16 of every
+24 hourly snapshots - the predict itself was fine, the laptop simply was not
+awake. `.github/workflows/hourly-predict.yml` therefore runs the same
+`Thailand_Rain_V10_deploy.py predict` on a GitHub runner every hour and commits
+the CSV to the `predictions` branch; the server's sync loop pulls those in.
+
+The cloud job needs no database and no secrets: Open-Meteo is public, the NOAA
+Himawari buckets are read unsigned, and the static 833-cell grid comes from the
+committed `deploy/th_grid_25km.csv` instead of Postgres. Output is bit-identical
+to a local run - verified against the same issue hour, max probability
+difference 0.00000 across all six targets.
+
+The pull is read-only with respect to the working tree: it updates a
+remote-tracking ref and reads blobs out of it, never checking anything out or
+switching branch. Snapshots older than `RETENTION_DAYS` are skipped rather than
+pulled, so sync and pruning do not fight. When both the laptop and the cloud
+produce the same hour, whichever lands first wins and the other is ignored.
 
 ## V9 health metric
 

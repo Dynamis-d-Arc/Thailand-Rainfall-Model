@@ -9,8 +9,13 @@ data/index.json + data/status.json. The page polls those files.
 Usage:
     python Dashboard/rainwatch_server.py [--port 8901] [--no-predict]
 
+It also pulls snapshots the GitHub Actions job published to the 'predictions'
+branch, which is what covers the hours this machine spent asleep.
+
 --no-predict serves whatever CSVs already exist without ever calling the
-live APIs (useful offline or when rate-limited).
+live APIs (useful offline or when rate-limited); combined with the sync loop
+it turns the dashboard into a pure viewer of cloud-produced predictions.
+--no-sync disables the pull instead.
 """
 
 import argparse
@@ -38,6 +43,9 @@ VERIFY_TIMEOUT = 45 * 60
 VERIFY_MIN_AGE_H = 7            # IMERG Late Run latency margin passed to the verifier
 RETENTION_DAYS = 30             # raw hourly prediction CSVs older than this are pruned
                                 # (the verification/health logs keep the distilled record)
+PRED_BRANCH = "predictions"     # data branch the GitHub Actions predict job publishes to
+SYNC_INTERVAL = 10 * 60         # how often to look for cloud-produced snapshots
+SYNC_TIMEOUT = 120
 
 P_COLS = ["p_h1_0.1mm", "p_h3_0.1mm", "p_h6_0.1mm",
           "p_h1_1.0mm", "p_h3_1.0mm", "p_h6_1.0mm"]
@@ -48,6 +56,8 @@ STATUS = {"last_attempt": None, "last_success": None, "last_error": None,
           "running": False, "run_minute": RUN_MINUTE, "predict_enabled": True,
           "verify_last_attempt": None, "verify_last_success": None,
           "verify_last_error": None, "verify_enabled": True,
+          "sync_last_attempt": None, "sync_last_success": None,
+          "sync_last_error": None, "sync_enabled": True, "sync_pulled_total": 0,
           "started_at": datetime.now().isoformat(timespec="seconds")}
 
 
@@ -257,6 +267,91 @@ def imerg_frontier():
         return None
 
 
+def _git(*args, timeout=SYNC_TIMEOUT):
+    """Run a read-only git command in the project repo.
+
+    GIT_TERMINAL_PROMPT=0 matters: without it a credential prompt on a failed
+    fetch would block this thread forever rather than returning an error.
+    """
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "1"}
+    return subprocess.run(["git", *args], cwd=str(PROJ), env=env,
+                          capture_output=True, timeout=timeout)
+
+
+def sync_predictions():
+    """Pull prediction CSVs that the GitHub Actions job published to PRED_BRANCH.
+
+    This is how the dashboard covers the hours the workstation slept through: the
+    cloud job keeps producing snapshots, and this drags them into PRED_DIR so
+    convert_all() can turn them into the JSON the page reads.
+
+    Read-only with respect to the working tree. It updates a remote-tracking ref
+    and reads blobs straight out of it, so it never checks anything out, never
+    switches branch, and cannot disturb uncommitted work.
+
+    Snapshots older than RETENTION_DAYS are skipped rather than pulled, otherwise
+    this and prune_old() would resurrect and re-delete the same files forever.
+    """
+    with _status_lock:
+        STATUS["sync_last_attempt"] = datetime.now().isoformat(timespec="seconds")
+
+    ref = f"refs/remotes/origin/{PRED_BRANCH}"
+    r = _git("fetch", "--depth", "1", "origin", f"{PRED_BRANCH}:{ref}")
+    if r.returncode != 0:
+        raise RuntimeError("fetch failed: "
+                           + r.stderr.decode(errors="replace").strip()[-300:])
+
+    r = _git("ls-tree", "--name-only", ref)
+    if r.returncode != 0:
+        raise RuntimeError("could not list " + PRED_BRANCH)
+    names = sorted(n for n in r.stdout.decode(errors="replace").splitlines()
+                   if n.startswith("v10_predictions_") and n.endswith(".csv"))
+
+    cutoff = datetime.now() - timedelta(days=RETENTION_DAYS)
+    pulled = []
+    for name in names:
+        dest = PRED_DIR / name
+        if dest.exists():
+            continue                      # local run already covered this hour
+        stamp = name[len("v10_predictions_"):-len(".csv")]
+        try:
+            ts = datetime.strptime(stamp, "%Y%m%d_%H%M")
+        except ValueError:
+            continue
+        if ts < cutoff:
+            continue                      # already pruned locally on purpose
+        blob = _git("show", f"{ref}:{name}")
+        if blob.returncode != 0 or not blob.stdout:
+            log(f"sync: could not read {name}")
+            continue
+        tmp = dest.parent / (dest.name + ".tmp")
+        tmp.write_bytes(blob.stdout)      # bytes: no newline translation
+        os.replace(tmp, dest)
+        pulled.append(stamp)
+    return pulled
+
+
+def sync_loop():
+    while True:
+        try:
+            pulled = sync_predictions()
+            with _status_lock:
+                STATUS["sync_last_success"] = datetime.now().isoformat(timespec="seconds")
+                STATUS["sync_last_error"] = None
+                STATUS["sync_pulled_total"] += len(pulled)
+            if pulled:
+                span = pulled[0] if len(pulled) == 1 else f"{pulled[0]}..{pulled[-1]}"
+                log(f"sync: pulled {len(pulled)} cloud snapshot(s) [{span}]")
+                convert_all()
+            save_status()
+        except Exception as exc:
+            with _status_lock:
+                STATUS["sync_last_error"] = f"{datetime.now():%Y-%m-%d %H:%M} {exc}"
+            log(f"sync FAILED: {exc}")
+            save_status()
+        time.sleep(SYNC_INTERVAL)
+
+
 def run_verify():
     with _status_lock:
         STATUS["verify_last_attempt"] = datetime.now().isoformat(timespec="seconds")
@@ -371,6 +466,9 @@ def main():
                     help="serve existing predictions only, never call live APIs")
     ap.add_argument("--no-verify", action="store_true",
                     help="disable the IMERG verification loop")
+    ap.add_argument("--no-sync", action="store_true",
+                    help=f"do not pull cloud-produced snapshots from the "
+                         f"'{PRED_BRANCH}' branch")
     ap.add_argument("--log-file", default=None,
                     help="append output here instead of the console (required when "
                          "run windowless via pythonw / Task Scheduler)")
@@ -388,6 +486,7 @@ def main():
     stamps = convert_all()
     STATUS["predict_enabled"] = not args.no_predict
     STATUS["verify_enabled"] = not (args.no_predict or args.no_verify)
+    STATUS["sync_enabled"] = not args.no_sync
     save_status()
     log(f"{len(stamps)} prediction snapshot(s) available"
         + (f", latest {stamps[-1]}" if stamps else ""))
@@ -398,6 +497,12 @@ def main():
         threading.Thread(target=predict_loop, daemon=True).start()
         log(f"predict loop armed: runs when no CSV exists for the current "
             f"hour and minute >= {RUN_MINUTE:02d}")
+    if STATUS["sync_enabled"]:
+        threading.Thread(target=sync_loop, daemon=True).start()
+        log(f"sync loop armed: pulling '{PRED_BRANCH}' every "
+            f"{SYNC_INTERVAL // 60} min")
+    else:
+        log("sync loop disabled (--no-sync)")
     if STATUS["verify_enabled"]:
         threading.Thread(target=verify_loop, daemon=True).start()
         log(f"verify loop armed: IMERG scoring every {VERIFY_INTERVAL // 3600} h")
