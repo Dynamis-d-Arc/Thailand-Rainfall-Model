@@ -1,6 +1,10 @@
 # Runtime deps for the GitHub Actions hourly predict job.
-# NOT the full research environment - no psycopg2 (the grid loader falls back to
-# deploy/th_grid_25km.csv when no database is reachable) and nothing for fit/verify.
+# NOT the full research environment - nothing here is for fit/verify.
+#
+# psycopg2 is needed only because BKK_Rain_V3 and Thailand_Rain_V3 import it at
+# module level, so the import chain fails without it. No database is reachable on
+# a runner: load_grid_geometry() catches the OperationalError and falls back to
+# deploy/th_grid_25km.csv. PGCONNECT_TIMEOUT in the workflow caps the wait.
 #
 # scikit-learn, lightgbm and numpy are pinned exactly: the deploy/*.joblib
 # bundles are pickles, and unpickling across a version bump can warn or break.
@@ -11,5 +15,6 @@ joblib==1.5.3
 
 pandas==3.0.3
 requests~=2.34
+psycopg2-binary~=2.9
 boto3~=1.43          # NOAA Himawari S3, unsigned/anonymous - no AWS credentials
 satpy~=0.60          # ahi_hsd reader for the B13 segments; pulls dask/xarray/pyresample
