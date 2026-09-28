@@ -1,0 +1,17 @@
+{
+  "segments": [
+    4,
+    5
+  ],
+  "band": "B13",
+  "probe_slot_utc": "2025-07-10 05:00:00",
+  "crop_ll_bbox": [
+    97.0,
+    5.3,
+    106.0,
+    20.9
+  ],
+  "cell_radius_deg": 0.1126,
+  "env_radius_deg": 0.5,
+  "n_cells": 833
+}

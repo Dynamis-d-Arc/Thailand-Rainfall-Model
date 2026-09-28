@@ -206,17 +206,28 @@ RAW_VARS = ["temperature_2m", "relative_humidity_2m", "pressure_msl", "surface_p
             "wind_direction_10m"]
 
 
+GRID_CSV = DEPLOY_DIR / "th_grid_25km.csv"
+
+
 def load_grid_geometry():
-    import psycopg2
-    from Thailand_Rain_V3 import DB_CONFIG
-    conn = psycopg2.connect(**DB_CONFIG)
+    """Static 833-cell geometry. Postgres stays the source of truth on the
+    workstation; the committed CSV mirror is what lets `predict` run where there
+    is no database (GitHub Actions). The grid never changes, so the two agree."""
     try:
-        grid = pd.read_sql(
-            'SELECT grid_number, grid_row, grid_column, longitude, latitude '
-            'FROM "Thailand_Grid_25km" ORDER BY grid_number', conn)
-    finally:
-        conn.close()
-    return grid
+        import psycopg2
+        from Thailand_Rain_V3 import DB_CONFIG
+        conn = psycopg2.connect(**DB_CONFIG)
+        try:
+            return pd.read_sql(
+                'SELECT grid_number, grid_row, grid_column, longitude, latitude '
+                'FROM "Thailand_Grid_25km" ORDER BY grid_number', conn)
+        finally:
+            conn.close()
+    except Exception as exc:
+        if not GRID_CSV.exists():
+            raise
+        log(f"grid: no Postgres ({type(exc).__name__}), using {GRID_CSV.name}")
+        return pd.read_csv(GRID_CSV)
 
 
 def build_adjacency(grid):

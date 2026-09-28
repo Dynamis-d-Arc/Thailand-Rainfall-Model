@@ -1,0 +1,102 @@
+# Hourly nationwide V10 rain prediction, run in the cloud.
+#
+# Why: the workstation that normally runs Dashboard/rainwatch_server.py sleeps
+# (Windows Modern Standby), so live coverage has been 8-14 hours out of 24.
+# This job has no such gap. It needs no database and no secrets: the grid comes
+# from the committed deploy/th_grid_25km.csv, Open-Meteo is a public API and the
+# NOAA Himawari buckets are read unsigned.
+#
+# Scope: predict only. `verify` still runs on the workstation - it needs Google
+# Earth Engine credentials and IMERG labels lag ~31 h anyway.
+name: hourly-predict
+
+on:
+  schedule:
+    # Every hour at :10 UTC. GitHub queues cron on a best-effort basis and can
+    # delay or drop runs under load, so treat this as "most hours", not all.
+    # The script picks its own issue hour (latest complete Asia/Bangkok hour)
+    # from the Open-Meteo response, so drift in launch time is harmless.
+    - cron: '10 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: hourly-predict
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
+
+      - run: pip install -r requirements-ci.txt
+
+      - name: Run V10 predict
+        env:
+          # points HW_DIR at the committed masks instead of the local _th_cache
+          TH_CACHE: ${{ github.workspace }}/ML_Model_V2/trained_models/om_thailand_rain_v10_deploy/deploy
+          # belt and braces: psycopg2 is not installed, so the grid loader falls
+          # back to the CSV on ImportError before any connection is attempted
+          PGCONNECT_TIMEOUT: '3'
+        run: |
+          set -euo pipefail
+          # marker for "which CSVs did this run write" - independent of git state
+          touch "$RUNNER_TEMP/run_marker"
+          python Thailand_Rain_V10_deploy.py predict
+
+      - name: Publish prediction to the data branch
+        run: |
+          set -euo pipefail
+          PRED_DIR="ML_Model_V2/trained_models/om_thailand_rain_v10_deploy"
+
+          mapfile -t NEW < <(find "$PRED_DIR" -maxdepth 1 -name 'v10_predictions_*.csv' \
+                             -newer "$RUNNER_TEMP/run_marker" | sort)
+          if [ "${#NEW[@]}" -eq 0 ]; then
+            echo "::error::predict wrote no prediction CSV"
+            exit 1
+          fi
+          echo "publishing: ${NEW[*]}"
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          TMP="$(mktemp -d)"
+          if git ls-remote --exit-code --heads origin predictions >/dev/null 2>&1; then
+            git fetch --depth 1 origin predictions:refs/remotes/origin/predictions
+            git worktree add "$TMP" -b pub origin/predictions
+          else
+            echo "data branch 'predictions' does not exist yet - creating it"
+            git worktree add --detach "$TMP"
+            git -C "$TMP" checkout --orphan pub
+            git -C "$TMP" rm -rf . >/dev/null 2>&1 || true
+          fi
+
+          cp "${NEW[@]}" "$TMP"/
+          git -C "$TMP" add -A
+          if git -C "$TMP" diff --cached --quiet; then
+            echo "nothing new to publish"
+            exit 0
+          fi
+          STAMP="$(basename "${NEW[0]}" .csv | sed 's/^v10_predictions_//')"
+          git -C "$TMP" commit -m "prediction $STAMP (github-actions)"
+          git -C "$TMP" push origin pub:predictions
+
+      # Backstop: even if the push above loses a race, the CSV is downloadable
+      # from the run page for 90 days.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prediction-${{ github.run_id }}
+          path: ML_Model_V2/trained_models/om_thailand_rain_v10_deploy/v10_predictions_*.csv
+          if-no-files-found: warn
+          retention-days: 90

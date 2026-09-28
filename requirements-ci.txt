@@ -1,0 +1,15 @@
+# Runtime deps for the GitHub Actions hourly predict job.
+# NOT the full research environment - no psycopg2 (the grid loader falls back to
+# deploy/th_grid_25km.csv when no database is reachable) and nothing for fit/verify.
+#
+# scikit-learn, lightgbm and numpy are pinned exactly: the deploy/*.joblib
+# bundles are pickles, and unpickling across a version bump can warn or break.
+scikit-learn==1.9.0
+lightgbm==4.7.0
+numpy==2.5.0
+joblib==1.5.3
+
+pandas==3.0.3
+requests~=2.34
+boto3~=1.43          # NOAA Himawari S3, unsigned/anonymous - no AWS credentials
+satpy~=0.60          # ahi_hsd reader for the B13 segments; pulls dask/xarray/pyresample

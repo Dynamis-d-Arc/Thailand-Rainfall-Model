@@ -25,3 +25,13 @@ ML_Model_V2/cache/
 
 # Large derived analysis output (rebuildable from Data_Analysis notebooks)
 Data_Analysis/om_bkk_analysis_outputs/om_bkk_daily_by_grid.csv
+
+# Weather-provider API keys for Dashboard/compare_providers.py
+Dashboard/provider_keys.json
+
+# --- GitHub Actions predict run needs these runtime artifacts tracked ---
+# (they are exceptions to the *.joblib / *.npz / _th_cache rules above)
+!ML_Model_V2/trained_models/om_thailand_rain_v10_deploy/deploy/*.joblib
+!ML_Model_V2/trained_models/om_thailand_rain_v10_deploy/deploy/himawari/pixel_masks.npz
+# scratch space satpy unpacks Himawari segments into at runtime
+ML_Model_V2/trained_models/om_thailand_rain_v10_deploy/deploy/himawari_tmp/
