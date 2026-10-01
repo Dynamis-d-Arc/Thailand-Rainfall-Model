@@ -43,6 +43,12 @@ VERIFY_TIMEOUT = 45 * 60
 VERIFY_MIN_AGE_H = 7            # IMERG Late Run latency margin passed to the verifier
 RETENTION_DAYS = 30             # raw hourly prediction CSVs older than this are pruned
                                 # (the verification/health logs keep the distilled record)
+# Windows: a windowless parent (pythonw, as the scheduled task runs us) spawning a
+# CONSOLE program gets a fresh console allocated for it - a black window that flashes
+# on the user's desktop. git.exe is a console program and the sync loop calls it every
+# 10 minutes, so this is not cosmetic. watchdog.py already did this for its toast.
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 PRED_BRANCH = "predictions"     # data branch the GitHub Actions predict job publishes to
 SYNC_INTERVAL = 10 * 60         # how often to look for cloud-produced snapshots
 SYNC_TIMEOUT = 120
@@ -275,7 +281,8 @@ def _git(*args, timeout=SYNC_TIMEOUT):
     """
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_OPTIONAL_LOCKS": "1"}
     return subprocess.run(["git", *args], cwd=str(PROJ), env=env,
-                          capture_output=True, timeout=timeout)
+                          capture_output=True, timeout=timeout,
+                          creationflags=NO_WINDOW)
 
 
 def sync_predictions():
@@ -365,7 +372,8 @@ def run_verify():
         result = subprocess.run(
             [sys.executable, str(ROOT / "verify_imerg.py"),
              "--min-age-hours", str(VERIFY_MIN_AGE_H)],
-            cwd=str(PROJ), capture_output=True, text=True, timeout=VERIFY_TIMEOUT)
+            cwd=str(PROJ), capture_output=True, text=True, timeout=VERIFY_TIMEOUT,
+            creationflags=NO_WINDOW)
         if result.returncode != 0:
             tail = (result.stdout + result.stderr).strip()[-500:]
             raise RuntimeError(f"verify exited {result.returncode}: {tail}")
@@ -403,7 +411,8 @@ def run_predict():
     try:
         result = subprocess.run(
             [sys.executable, str(PROJ / "Thailand_Rain_V10_deploy.py"), "predict"],
-            cwd=str(PROJ), capture_output=True, text=True, timeout=PREDICT_TIMEOUT)
+            cwd=str(PROJ), capture_output=True, text=True, timeout=PREDICT_TIMEOUT,
+            creationflags=NO_WINDOW)
         if result.returncode != 0:
             tail = (result.stdout + result.stderr).strip()[-500:]
             raise RuntimeError(f"predict exited {result.returncode}: {tail}")

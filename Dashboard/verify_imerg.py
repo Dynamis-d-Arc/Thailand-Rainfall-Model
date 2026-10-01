@@ -170,7 +170,10 @@ def run_fetch(start_date, end_date):
            "--start-date", start_date.strftime("%Y-%m-%d"),
            "--end-date", end_date.strftime("%Y-%m-%d")]
     log("fetching IMERG " + " ".join(cmd[2:]))
-    r = subprocess.run(cmd, cwd=str(PROJ), capture_output=True, text=True, timeout=30 * 60)
+    # creationflags: harmless here (sys.executable is pythonw under the scheduled
+    # task) but keeps the no-console rule uniform across the project's spawns.
+    r = subprocess.run(cmd, cwd=str(PROJ), capture_output=True, text=True, timeout=30 * 60,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     tail = (r.stdout + r.stderr).strip().splitlines()
     for line in tail[-4:]:
         log(f"  fetch| {line}")
