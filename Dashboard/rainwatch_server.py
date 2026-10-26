@@ -25,7 +25,14 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+# Prediction stamps are Bangkok local time, whatever zone the machine clock is in.
+BKK = timezone(timedelta(hours=7))
+
+
+def bkk_now():
+    return datetime.now(BKK).replace(tzinfo=None)
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -64,11 +71,11 @@ STATUS = {"last_attempt": None, "last_success": None, "last_error": None,
           "verify_last_error": None, "verify_enabled": True,
           "sync_last_attempt": None, "sync_last_success": None,
           "sync_last_error": None, "sync_enabled": True, "sync_pulled_total": 0,
-          "started_at": datetime.now().isoformat(timespec="seconds")}
+          "started_at": bkk_now().isoformat(timespec="seconds")}
 
 
 def log(msg):
-    print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
+    print(f"[{bkk_now():%H:%M:%S}] {msg}", flush=True)
 
 
 def atomic_write(path: Path, text: str):
@@ -97,7 +104,7 @@ def csv_to_json(csv_path: Path, out_path: Path):
 
 
 def prune_old():
-    cutoff = datetime.now() - timedelta(days=RETENTION_DAYS)
+    cutoff = bkk_now() - timedelta(days=RETENTION_DAYS)
     removed = 0
     for p in PRED_DIR.glob("v10_predictions_*.csv"):
         stamp = p.stem.replace("v10_predictions_", "")
@@ -129,7 +136,7 @@ def convert_all():
         except Exception as exc:
             log(f"convert failed for {csv_path.name}: {exc}")
     index = {"issues": stamps, "latest": stamps[-1] if stamps else None,
-             "generated": datetime.now().isoformat(timespec="seconds")}
+             "generated": bkk_now().isoformat(timespec="seconds")}
     atomic_write(DATA / "index.json", json.dumps(index))
     build_health()
     build_verification(stamps)
@@ -188,11 +195,11 @@ def build_health():
 def build_verification(stamps):
     """data/verification.json — rolling scores of past predictions vs observed IMERG."""
     payload = {"targets": {}, "window_days": 14, "pending": 0,
-               "updated": datetime.now().isoformat(timespec="seconds")}
+               "updated": bkk_now().isoformat(timespec="seconds")}
     vlog = PRED_DIR / "v10_verification_log.csv"
     blog = PRED_DIR / "v10_baseline_log.csv"
     scored_stamps = set()
-    window_start = datetime.now() - timedelta(days=14)
+    window_start = bkk_now() - timedelta(days=14)
 
     def skill(g):
         """Pooled confusion + mean per-issue ROC + n-weighted Brier over a log slice."""
@@ -236,7 +243,7 @@ def build_verification(stamps):
                     payload["targets"][tgt].setdefault("baselines", {})[name] = skill(g)
         except Exception as exc:
             log(f"baseline log read failed: {exc}")
-    mature_cut = datetime.now() - timedelta(hours=6 + VERIFY_MIN_AGE_H)
+    mature_cut = bkk_now() - timedelta(hours=6 + VERIFY_MIN_AGE_H)
     for s in stamps:
         try:
             if datetime.strptime(s, "%Y%m%d_%H%M") <= mature_cut and s not in scored_stamps:
@@ -247,7 +254,7 @@ def build_verification(stamps):
     if latest is not None:
         payload["imerg_latest"] = str(latest)[:16]
         payload["imerg_lag_days"] = round(
-            (datetime.now() - latest).total_seconds() / 86400, 1)
+            (bkk_now() - latest).total_seconds() / 86400, 1)
     atomic_write(DATA / "verification.json", json.dumps(payload))
 
 
@@ -300,7 +307,7 @@ def sync_predictions():
     this and prune_old() would resurrect and re-delete the same files forever.
     """
     with _status_lock:
-        STATUS["sync_last_attempt"] = datetime.now().isoformat(timespec="seconds")
+        STATUS["sync_last_attempt"] = bkk_now().isoformat(timespec="seconds")
 
     ref = f"refs/remotes/origin/{PRED_BRANCH}"
     # --force is required, not cosmetic. A --depth 1 fetch grafts a parentless
@@ -318,7 +325,7 @@ def sync_predictions():
     names = sorted(n for n in r.stdout.decode(errors="replace").splitlines()
                    if n.startswith("v10_predictions_") and n.endswith(".csv"))
 
-    cutoff = datetime.now() - timedelta(days=RETENTION_DAYS)
+    cutoff = bkk_now() - timedelta(days=RETENTION_DAYS)
     pulled = []
     for name in names:
         dest = PRED_DIR / name
@@ -347,7 +354,7 @@ def sync_loop():
         try:
             pulled = sync_predictions()
             with _status_lock:
-                STATUS["sync_last_success"] = datetime.now().isoformat(timespec="seconds")
+                STATUS["sync_last_success"] = bkk_now().isoformat(timespec="seconds")
                 STATUS["sync_last_error"] = None
                 STATUS["sync_pulled_total"] += len(pulled)
             if pulled:
@@ -357,7 +364,7 @@ def sync_loop():
             save_status()
         except Exception as exc:
             with _status_lock:
-                STATUS["sync_last_error"] = f"{datetime.now():%Y-%m-%d %H:%M} {exc}"
+                STATUS["sync_last_error"] = f"{bkk_now():%Y-%m-%d %H:%M} {exc}"
             log(f"sync FAILED: {exc}")
             save_status()
         time.sleep(SYNC_INTERVAL)
@@ -365,7 +372,7 @@ def sync_loop():
 
 def run_verify():
     with _status_lock:
-        STATUS["verify_last_attempt"] = datetime.now().isoformat(timespec="seconds")
+        STATUS["verify_last_attempt"] = bkk_now().isoformat(timespec="seconds")
     save_status()
     log("launching IMERG verification")
     try:
@@ -381,11 +388,11 @@ def run_verify():
                         if ln.startswith("VERIFY_SUMMARY")), "VERIFY_SUMMARY {}")
         log(f"verification done: {summary.split(' ', 1)[1]}")
         with _status_lock:
-            STATUS["verify_last_success"] = datetime.now().isoformat(timespec="seconds")
+            STATUS["verify_last_success"] = bkk_now().isoformat(timespec="seconds")
             STATUS["verify_last_error"] = None
     except Exception as exc:
         with _status_lock:
-            STATUS["verify_last_error"] = f"{datetime.now():%Y-%m-%d %H:%M} {exc}"
+            STATUS["verify_last_error"] = f"{bkk_now():%Y-%m-%d %H:%M} {exc}"
         log(f"verification FAILED: {exc}")
     finally:
         convert_all()
@@ -404,7 +411,7 @@ def verify_loop():
 
 def run_predict():
     with _status_lock:
-        STATUS["last_attempt"] = datetime.now().isoformat(timespec="seconds")
+        STATUS["last_attempt"] = bkk_now().isoformat(timespec="seconds")
         STATUS["running"] = True
     save_status()
     log("launching V10 predict")
@@ -417,12 +424,12 @@ def run_predict():
             tail = (result.stdout + result.stderr).strip()[-500:]
             raise RuntimeError(f"predict exited {result.returncode}: {tail}")
         with _status_lock:
-            STATUS["last_success"] = datetime.now().isoformat(timespec="seconds")
+            STATUS["last_success"] = bkk_now().isoformat(timespec="seconds")
             STATUS["last_error"] = None
         log("predict finished ok")
     except Exception as exc:
         with _status_lock:
-            STATUS["last_error"] = f"{datetime.now():%Y-%m-%d %H:%M} {exc}"
+            STATUS["last_error"] = f"{bkk_now():%Y-%m-%d %H:%M} {exc}"
         log(f"predict FAILED: {exc}")
     finally:
         with _status_lock:
@@ -438,7 +445,7 @@ def predict_loop():
     fail_streak = 0
     while True:
         try:
-            now = datetime.now()
+            now = bkk_now()
             want = now.strftime("%Y%m%d_%H00")
             have = (PRED_DIR / f"v10_predictions_{want}.csv").exists()
             if now.minute >= RUN_MINUTE and not have:

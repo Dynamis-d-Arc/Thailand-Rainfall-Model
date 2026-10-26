@@ -33,7 +33,14 @@ import json
 import os
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+# Prediction stamps are Bangkok local time, whatever zone the machine clock is in.
+BKK = timezone(timedelta(hours=7))
+
+
+def bkk_now():
+    return datetime.now(BKK).replace(tzinfo=None)
 from pathlib import Path
 
 import numpy as np
@@ -76,7 +83,7 @@ DB_CONFIG = {
 
 
 def log(msg):
-    print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
+    print(f"[{bkk_now():%H:%M:%S}] {msg}", flush=True)
 
 
 def prediction_issues():
@@ -205,7 +212,7 @@ def score_issue(stamp, issue, csv_path, pmax, rt, done, done_base, clim, thr_map
     lead_hours = [issue + timedelta(hours=k) for k in range(1, MAX_LEAD + 1)]
     hist_hours = [issue - timedelta(hours=k) for k in range(MAX_LEAD - 1, -1, -1)]
     rows, base_rows, health = [], [], None
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    now_str = bkk_now().strftime("%Y-%m-%d %H:%M")
 
     # lead / history matrices aligned to prediction cells (NaN where an hour is missing)
     def aligned(hours):
@@ -317,7 +324,7 @@ def main():
     done_base = scored_baselines()
     clim = load_climatology()
     want_base = [b for b in BASELINES if b != "climatology" or clim is not None]
-    now = datetime.now()
+    now = bkk_now()
     mature = [(s, t, p) for s, t, p in prediction_issues()
               if t + timedelta(hours=MAX_LEAD + args.min_age_hours) <= now]
 

@@ -23,7 +23,14 @@ import json
 import subprocess
 import sys
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+# Prediction stamps are Bangkok local time, whatever zone the machine clock is in.
+BKK = timezone(timedelta(hours=7))
+
+
+def bkk_now():
+    return datetime.now(BKK).replace(tzinfo=None)
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -41,7 +48,7 @@ STARTUP_GRACE_MIN = 30   # server started this recently -> skip staleness checks
 
 
 def out(msg):
-    line = f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}"
+    line = f"[{bkk_now():%Y-%m-%d %H:%M:%S}] {msg}"
     try:
         WLOG.parent.mkdir(exist_ok=True)
         if WLOG.exists() and WLOG.stat().st_size > 1_000_000:
@@ -83,7 +90,7 @@ def newest_prediction_age_h():
                 p.stem.replace("v10_predictions_", ""), "%Y%m%d_%H%M"))
         except ValueError:
             pass
-    return (datetime.now() - max(stamps)).total_seconds() / 3600 if stamps else None
+    return (bkk_now() - max(stamps)).total_seconds() / 3600 if stamps else None
 
 
 def load_json(path):
@@ -113,7 +120,7 @@ def imerg_lag_days():
             conn.close()
         if latest is None:
             return None
-        return (datetime.now() - latest).total_seconds() / 86400
+        return (bkk_now() - latest).total_seconds() / 86400
     except Exception:
         return None   # DB down is surfaced through predict errors, not here
 
@@ -137,7 +144,7 @@ def find_problems():
     started = status.get("started_at")
     if started:
         try:
-            in_grace = datetime.now() - datetime.fromisoformat(started) \
+            in_grace = bkk_now() - datetime.fromisoformat(started) \
                 < timedelta(minutes=STARTUP_GRACE_MIN)
         except ValueError:
             pass
@@ -155,7 +162,7 @@ def find_problems():
     if status.get("verify_enabled"):
         ok = status.get("verify_last_success")
         if ok and not in_grace:
-            since = datetime.now() - datetime.fromisoformat(ok)
+            since = bkk_now() - datetime.fromisoformat(ok)
             if since > timedelta(hours=VERIFY_STALE_H):
                 problems["stale_verify"] = (
                     f"Last successful IMERG verification was "
@@ -170,7 +177,7 @@ def find_problems():
         # the real signal.
         ok = status.get("sync_last_success")
         if ok and not in_grace:
-            since = datetime.now() - datetime.fromisoformat(ok)
+            since = bkk_now() - datetime.fromisoformat(ok)
             if since > timedelta(hours=SYNC_STALE_H):
                 problems["stale_sync"] = (
                     f"No successful pull of cloud predictions for "
@@ -190,7 +197,7 @@ def main():
 
     problems = find_problems()
     state = load_json(STATE)
-    now = datetime.now()
+    now = bkk_now()
     sent = 0
     for kind, msg in problems.items():
         last = state.get(kind)
