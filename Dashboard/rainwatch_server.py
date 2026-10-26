@@ -44,6 +44,7 @@ PRED_DIR = PROJ / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v10_deplo
 V9_DIR = PROJ / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v9_2026_decay"
 DATA = ROOT / "data"
 RUN_MINUTE = 10        # earliest minute past the hour to launch a predict run
+MAX_LAUNCHES_PER_HOUR = 2   # the :10 run plus one retry after the cool-down; the cloud run covers the rest
 PREDICT_TIMEOUT = 25 * 60
 VERIFY_INTERVAL = 6 * 3600      # how often the IMERG verification loop wakes up
 VERIFY_TIMEOUT = 45 * 60
@@ -409,6 +410,19 @@ def verify_loop():
         time.sleep(VERIFY_INTERVAL)
 
 
+def _failure_record(exit_code, stdout, stderr):
+    """Save the predictor's complete output under data/ and return a one-line summary."""
+    def text(t):
+        return t.decode(errors="replace") if isinstance(t, bytes) else (t or "")
+    stdout, stderr = text(stdout), text(stderr)
+    # shortcut: predict_fail_*.log files are never pruned; add them to prune_old() if they pile up
+    path = DATA / f"predict_fail_{bkk_now():%Y%m%d_%H%M%S}.log"
+    atomic_write(path, f"exit code: {exit_code}\n\n--- stdout ---\n{stdout}\n\n--- stderr ---\n{stderr}\n")
+    lines = [l for l in (stderr if stderr.strip() else stdout).splitlines() if l.strip()]
+    last = lines[-1][:300] if lines else "(no output)"
+    return f"predict exited {exit_code}: {last} [full output: data/{path.name}]"
+
+
 def run_predict():
     with _status_lock:
         STATUS["last_attempt"] = bkk_now().isoformat(timespec="seconds")
@@ -421,16 +435,18 @@ def run_predict():
             cwd=str(PROJ), capture_output=True, text=True, timeout=PREDICT_TIMEOUT,
             creationflags=NO_WINDOW)
         if result.returncode != 0:
-            tail = (result.stdout + result.stderr).strip()[-500:]
-            raise RuntimeError(f"predict exited {result.returncode}: {tail}")
+            raise RuntimeError(_failure_record(result.returncode, result.stdout, result.stderr))
         with _status_lock:
             STATUS["last_success"] = bkk_now().isoformat(timespec="seconds")
             STATUS["last_error"] = None
         log("predict finished ok")
     except Exception as exc:
+        msg = str(exc)
+        if isinstance(exc, subprocess.TimeoutExpired):
+            msg = _failure_record("timeout", exc.stdout, exc.stderr)
         with _status_lock:
-            STATUS["last_error"] = f"{bkk_now():%Y-%m-%d %H:%M} {exc}"
-        log(f"predict FAILED: {exc}")
+            STATUS["last_error"] = f"{bkk_now():%Y-%m-%d %H:%M} {msg}"
+        log(f"predict FAILED: {msg}")
     finally:
         with _status_lock:
             STATUS["running"] = False
@@ -438,31 +454,47 @@ def run_predict():
         save_status()
 
 
+def predict_tick(state):
+    """One pass of the predict loop; returns the seconds to wait before the next pass.
+
+    Launches only when the current Bangkok hour has no CSV yet, at most
+    MAX_LAUNCHES_PER_HOUR times per hour (covers both failed runs and runs that
+    wrote an older issue hour), with an escalating cool-down after failures: a
+    rate-limited or blocked upstream API (Open-Meteo escalated 429s to connection
+    refusals on 2026-09-05 after ~10-minutely retry storms) recovers faster when
+    we stop hammering it.
+    """
+    now = bkk_now()
+    want = now.strftime("%Y%m%d_%H00")
+    if now.minute < RUN_MINUTE or (PRED_DIR / f"v10_predictions_{want}.csv").exists():
+        return 60
+    launches = state["launched"].get(want, 0)
+    if launches >= MAX_LAUNCHES_PER_HOUR:
+        return 60
+    state["launched"] = {want: launches + 1}      # only the current hour matters
+    run_predict()
+    with _status_lock:
+        failed = STATUS["last_error"] is not None
+    if not failed:
+        state["fail_streak"] = 0
+        return 60
+    state["fail_streak"] += 1
+    cooldown = min(3600, 600 * state["fail_streak"])
+    capped = launches + 1 >= MAX_LAUNCHES_PER_HOUR
+    log(f"predict failed ({state['fail_streak']} in a row); cooling down {cooldown // 60} min"
+        + (f"; no further launches for {want}" if capped else ""))
+    return cooldown
+
+
 def predict_loop():
-    # Escalating cool-down after consecutive failures: a rate-limited or blocked
-    # upstream API (Open-Meteo escalated 429s to connection refusals on 2026-09-05
-    # after ~10-minutely retry storms) recovers faster when we stop hammering it.
-    fail_streak = 0
+    state = {"fail_streak": 0, "launched": {}}
     while True:
         try:
-            now = bkk_now()
-            want = now.strftime("%Y%m%d_%H00")
-            have = (PRED_DIR / f"v10_predictions_{want}.csv").exists()
-            if now.minute >= RUN_MINUTE and not have:
-                run_predict()
-                with _status_lock:
-                    failed = STATUS["last_error"] is not None
-                if failed:
-                    fail_streak += 1
-                    cooldown = min(3600, 600 * fail_streak)
-                    log(f"predict failed ({fail_streak} in a row); "
-                        f"cooling down {cooldown // 60} min")
-                    time.sleep(cooldown)
-                else:
-                    fail_streak = 0
+            delay = predict_tick(state)
         except Exception as exc:
             log(f"predict loop error: {exc}")
-        time.sleep(60)
+            delay = 60
+        time.sleep(delay)
 
 
 class Handler(SimpleHTTPRequestHandler):
