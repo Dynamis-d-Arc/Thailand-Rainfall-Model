@@ -1,0 +1,76 @@
+# Thailand Rainfall Model — where to look
+
+Orientation for coding agents. Read this before searching; the repo has ~50
+root-level notebooks and scripts and most of them are superseded.
+
+## Where the latest version is
+
+- **This folder, branch `main`**, is the source of truth. Remote:
+  https://github.com/Dynamis-d-Arc/Thailand-Rainfall-Model (public).
+- Remote branch `predictions` is **output only**: hourly prediction CSVs
+  committed by GitHub Actions. Never put code there.
+- Nothing is pinned to a release. "Latest" = `git log -1 main`.
+
+## Start here, in this order
+
+1. `Docs/handover_2026-08-12.md` — most recent narrative of what exists, what
+   was proven, what is open. Earlier handovers (08-01, 08-11) are history.
+2. `Docs/capstone_experiments.md` — the experiment ladder and why each step
+   exists. Quote numbers from the stored outputs it names, not from prose.
+3. `Dashboard/README.md` — the live system: server, watchdog, cloud predict,
+   IMERG verification loop, provider comparison.
+
+## What is live (the only code that runs in production)
+
+| Thing | File |
+|---|---|
+| Model fit / verify / predict | `Thailand_Rain_V10_deploy.py` (`fit`, `verify`, `predict`) |
+| Packaged models (6 targets) | `ML_Model_V2/trained_models/om_thailand_rain_v10_deploy/deploy/th_rain_h{1,3,6}_{0.1,1.0}mm.joblib` |
+| Static 833-cell grid (no DB needed) | `.../om_thailand_rain_v10_deploy/deploy/th_grid_25km.csv` |
+| Prediction / health / baseline logs | `.../om_thailand_rain_v10_deploy/v10_*.csv` |
+| Dashboard server (localhost:8901) | `Dashboard/rainwatch_server.py`, `Dashboard/index.html` |
+| Cloud hourly predict | `.github/workflows/hourly-predict.yml` |
+| Verification against observed rain | `Dashboard/verify_imerg.py` |
+
+## The experiment chain (root-level `.py` files, jupytext percent format)
+
+- `BKK_Rain_V3.py` is the **shared protocol module** (CV machinery, feature
+  list, targets, thresholds). Every later script imports from it. Change it
+  with care: V4–V13 and V10 deploy all depend on it.
+- Bangkok ladder: `BKK_Rain_V3..V7_*.py`. Thailand ladder:
+  `Thailand_Rain_V3.py` (nationwide panel, IMERG labels), `V7` (Himawari IR,
+  the main gain), `V8` (forecast-staleness gate), `V9` (2026 warm-rain decay),
+  `V10` (deploy), `V12` (multiband pilot, not deployed), `V13` (dry season).
+- Each experiment writes to `ML_Model_V2/trained_models/<experiment_name>/`.
+  Search there for stored metrics, fold tables and manifests.
+- `ML_Model_V2/_th_cache/`, `_v3_cache/`, `cache/` are regenerable fold
+  caches, gitignored and multi-GB. Do not read them to answer questions.
+
+## Data pipeline (Postgres, local)
+
+- Connection: `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD` env vars, defaults
+  to localhost / db `postgres` (see `DB_CONFIG` in any `OM_Script/*.py`).
+- Fetch + precompute: `OM_Script/` (Open-Meteo, always pass `models=`
+  explicitly), `IMERG_Script/` (NASA IMERG via Google Earth Engine, see its
+  README), `DB_Script/` (grids, boundaries, lag features, TMD gauges).
+- Main tables: `"OM_Thailand_Data"`, `"OM_Thailand_Forecast_Data"`,
+  `"IMERG_THAILAND_DATA"`, `thailand_grid_25km`, and the Bangkok-era
+  `"OM_BKK_DATA"`, `"OM_BKK_DATA_PRECOMPUTE"`, `"IMERG_BKK_DATA"`,
+  `"BKK_TMD_WEATHER_DATA"`.
+- Analysis of label disagreement (gauge vs IMERG vs Open-Meteo): `Data_Analysis/`.
+
+## Superseded — search here only for history
+
+- Every root-level `*.ipynb`, `BKK_3_Class_*`, `BKK_Rain_V0..V2*`,
+  `TMD_BKK_*`, `OM_BKK_V1`: July 2026 exploration, replaced by the V3 protocol.
+- `ML_Models/`: the first Bangkok model (pre-V2). `outputs/`: old maps.
+- `ML_Model_V2/train_bkk_rain_next_*h.py` and `build_bkk_rain_v2_deploy.py`:
+  Bangkok V2, replaced by V3+.
+
+## Conventions that bite
+
+- Dashboard code must use `bkk_now()` for time, never the machine clock.
+- Prediction stamps are Bangkok local hours (`v10_predictions_YYYYMMDD_HHMM.csv`).
+- Any claim in a report must trace to a stored output, code, or the DB.
+- `*.joblib`, `*.npy`, `*.npz`, `*.log` are gitignored except the `deploy/`
+  artifacts the cloud job needs.
