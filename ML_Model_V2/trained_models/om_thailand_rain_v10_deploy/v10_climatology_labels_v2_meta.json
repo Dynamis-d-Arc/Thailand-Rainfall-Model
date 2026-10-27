@@ -1,0 +1,12 @@
+{
+ "built": "2026-10-27 21:46",
+ "history": [
+  "2024-07-01",
+  "2026-07-31"
+ ],
+ "pool_hours": 1,
+ "rows": 239904,
+ "label": "IMERG precipitation_pixelmax_mm >= thr in ANY of the h hours starting at t (window [t, t+h)), complete hours only",
+ "label_version": "labels_v2",
+ "samples_per_bin_median": 186
+}

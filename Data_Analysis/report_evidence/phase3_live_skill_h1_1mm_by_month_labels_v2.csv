@@ -1,0 +1,4 @@
+month,issue_hours,model_roc,persistence_roc,climatology_roc
+2026-08,28,0.736,0.869,0.54
+2026-09,123,0.828,0.899,0.607
+2026-10,584,0.886,0.931,0.718

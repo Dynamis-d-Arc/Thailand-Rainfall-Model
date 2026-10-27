@@ -32,3 +32,19 @@ Used by the V9.1 report, section 3.7, Tables 22 and 23, Limitations and Risks.
 | Hourly coverage: laptop only 45 %, with the cloud job 99.1 %, last 30 days 97.1 % (NFR6) | `phase3_hourly_coverage.csv`, `phase3_hourly_coverage_by_day.csv` | from prediction files on disk, in git HEAD, on the `predictions` branch, and the health and verification logs |
 | GitHub Actions: 760 runs, 756 successes, 137 from GitHub's own schedule, about 8 min per run | `phase3_github_actions_runs.csv`, `phase3_github_actions_failures.csv` | `gh run list --workflow hourly-predict.yml` on 27 Oct 2026 |
 | Live-labelled cold-top share of rain by month | `phase3_ir_health_live_labeled_by_month.csv` | Aug 0.78, Sep 0.79, Oct 0.73 (weighted by wet cells) |
+
+## Corrected labels (`labels_v2`), added 27 October 2026
+
+Window [t, t+h) on the wettest pixel's hourly total; see `Docs/label_fix_2026-10-27.md`. The
+unsuffixed files above are the pre-fix evidence and are kept as they were. Used by the V9.2
+(corrected labels) report copy.
+
+| Report figure | Evidence file | Stored value |
+|---|---|---|
+| How much the correction changes each label | `label_change_labels_v2_summary.csv` (+ `label_change_labels_v2.csv` by month) | 4.8–11.8 % of labels change, almost all from the window shift; the pixel max removes 0.5–3.9 % of the old positives and never adds any (16,485,070 cell-hours) |
+| Live model vs persistence vs climatology, corrected labels, rescored retrospectively | `phase3_live_skill_vs_baselines_labels_v2.csv` | 721–745 issue hours per target, 11 Aug–26 Oct 2026; model ROC 0.800–0.871, climatology 0.688–0.701, persistence 0.687–0.923 |
+| Model skill on every rescored issue hour | `phase3_live_skill_all_verified_labels_v2.csv` | 749 issue hours scored; 231 verified hours (6–27 Sep) have no prediction file left and cannot be rescored |
+| 1 h 1.0 mm skill by month, corrected labels | `phase3_live_skill_h1_1mm_by_month_labels_v2.csv` | Aug 0.74 (28 h), Sep 0.83 (123), Oct 0.89 (584) |
+| Live-labelled cold-top share of rain by month, corrected labels | `phase3_ir_health_live_labeled_by_month_labels_v2.csv` | Aug 0.82, Sep 0.73, Oct 0.82 |
+| Bangkok provider pilot, aligned intervals, 3 h as bounds | `../../ML_Model_V2/trained_models/om_thailand_rain_v10_deploy/provider_scores_labels_v2.csv` | 46 issue hours 24–29 Sep 2026; area-average 1 h: model 0.89 vs Open-Meteo 0.76 |
+| Cross-validation on corrected labels | `../../ML_Model_V2/trained_models/om_thailand_rain_v3_labels_v2/`, `om_thailand_rain_v13_allseason_labels_v2/` (incl. `cv_old_vs_new_labels_v2.csv`) | written by the retraining chain |
