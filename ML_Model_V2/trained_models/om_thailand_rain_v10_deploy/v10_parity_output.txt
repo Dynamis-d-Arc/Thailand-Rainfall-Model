@@ -1,0 +1,7 @@
+[17:35:56] phase: parity
+[17:35:57]   2026-06-15 12:00:00: max |python - sql| over 66 features x 833 grids = 2.27e-13   (worst feature: neighbor_pressure_msl_mean)
+[17:35:57]   2026-06-02 00:00:00: max |python - sql| over 66 features x 833 grids = 2.27e-13   (worst feature: neighbor_pressure_msl_mean)
+[17:35:57]   2026-06-28 20:00:00: max |python - sql| over 66 features x 833 grids = 2.27e-13   (worst feature: neighbor_pressure_msl_mean)
+[17:36:01]   IR features 2026-06-15 12:00:00: max |python - cache| = 0.00e+00 (833 cells)
+[17:36:01] parity OK: live builder reproduces the training features
+[17:36:01] phase parity done in 0.1 min
