@@ -52,26 +52,37 @@ def live_skill():
         .rename(columns={"roc_auc": "climatology_roc", "brier": "climatology_brier"})
     j = m.merge(p, on=["stamp", "target"]).merge(c, on=["stamp", "target"])
     j = j.dropna(subset=["model_roc", "persistence_roc", "climatology_roc"])
-    rows = []
-    for t in TARGETS:
-        d = j[j.target == t]
-        rows.append({
-            "target": t, "issue_hours": len(d),
-            "first_issue": d.issue_local.min(), "last_issue": d.issue_local.max(),
-            "mean_base_rate": round(d.base_rate.mean(), 3),
-            "model_roc": round(d.model_roc.mean(), 3),
-            "persistence_roc": round(d.persistence_roc.mean(), 3),
-            "climatology_roc": round(d.climatology_roc.mean(), 3),
-            "model_brier": round(d.model_brier.mean(), 3),
-            "persistence_brier": round(d.persistence_brier.mean(), 3),
-            "climatology_brier": round(d.climatology_brier.mean(), 3),
-            "pct_hours_model_beats_climatology_roc": round(100 * (d.model_roc > d.climatology_roc).mean(), 1),
-            "pct_hours_model_beats_persistence_roc": round(100 * (d.model_roc > d.persistence_roc).mean(), 1),
-            "model_pod": round(d.pod.mean(), 2), "model_far": round(d.far.mean(), 2),
-            "model_csi": round(d.csi.mean(), 2),
-            "provisional_label_share": round(d.provisional_share.mean(), 3),
-        })
-    save(pd.DataFrame(rows), f"phase3_live_skill_vs_baselines_{LABELS}.csv")
+    def skill_table(j):
+        rows = []
+        for t in TARGETS:
+            d = j[j.target == t]
+            if d.empty:
+                continue
+            rows.append({
+                "target": t, "issue_hours": len(d),
+                "first_issue": d.issue_local.min(), "last_issue": d.issue_local.max(),
+                "mean_base_rate": round(d.base_rate.mean(), 3),
+                "model_roc": round(d.model_roc.mean(), 3),
+                "persistence_roc": round(d.persistence_roc.mean(), 3),
+                "climatology_roc": round(d.climatology_roc.mean(), 3),
+                "model_brier": round(d.model_brier.mean(), 3),
+                "persistence_brier": round(d.persistence_brier.mean(), 3),
+                "climatology_brier": round(d.climatology_brier.mean(), 3),
+                "pct_hours_model_beats_climatology_roc": round(100 * (d.model_roc > d.climatology_roc).mean(), 1),
+                "pct_hours_model_beats_persistence_roc": round(100 * (d.model_roc > d.persistence_roc).mean(), 1),
+                "model_pod": round(d.pod.mean(), 2), "model_far": round(d.far.mean(), 2),
+                "model_csi": round(d.csi.mean(), 2),
+                "provisional_label_share": round(d.provisional_share.mean(), 3),
+            })
+        return pd.DataFrame(rows)
+
+    save(skill_table(j), f"phase3_live_skill_vs_baselines_{LABELS}.csv")
+    # scores produced by the corrected-label models (live since 2026-10-28): prediction files
+    # carry model_build from that swap on and verify_imerg copies it into the log
+    if "model_build" in j.columns:
+        new = j[j.model_build.fillna("").astype(str).str.len() > 0]
+        if len(new):
+            save(skill_table(new), f"phase3_live_skill_vs_baselines_{LABELS}_corrected_models.csv")
     # model only, every verified issue hour (starts 11 Aug, before the baselines existed)
     g = v.groupby("target")
     save(pd.DataFrame({"target": g.size().index, "issue_hours": g.size().values,

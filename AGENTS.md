@@ -25,7 +25,7 @@ root-level notebooks and scripts and most of them are superseded.
 | Thing | File |
 |---|---|
 | Model fit / verify / predict | `Thailand_Rain_V10_deploy.py` (`fit`, `verify`, `predict`) |
-| Packaged models (6 targets) | `ML_Model_V2/trained_models/om_thailand_rain_v10_deploy/deploy/th_rain_h{1,3,6}_{0.1,1.0}mm.joblib` |
+| Packaged models (6 targets) | `ML_Model_V2/trained_models/om_thailand_rain_v10_deploy/deploy/th_rain_h{1,3,6}_{0.1,1.0}mm.joblib` (V13 refit on the corrected labels, live since 2026-10-28; earlier fits in `deploy_v13_shifted_window_backup/` and `deploy_v10_wet_only_backup/`, see `v10_manifest.json`) |
 | Static 833-cell grid (no DB needed) | `.../om_thailand_rain_v10_deploy/deploy/th_grid_25km.csv` |
 | Prediction / health / baseline logs | `.../om_thailand_rain_v10_deploy/v10_*.csv` |
 | Dashboard server (localhost:8901) | `Dashboard/rainwatch_server.py`, `Dashboard/index.html` |

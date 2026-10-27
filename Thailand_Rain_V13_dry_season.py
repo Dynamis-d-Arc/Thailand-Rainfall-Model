@@ -163,6 +163,7 @@ def phase_deploy():
             "model": model, "calibrator": calibrator, "threshold": op_threshold,
             "feature_names": ALL_FEATURES, "target": tname, "horizon_h": horizon,
             "rain_threshold_mm": threshold_mm, "trained_rows": int(len(y)),
+            "built": time.strftime("%Y-%m-%d %H:%M:%S"), "label_version": v3.LABEL_VERSION,
             "notes": "Thailand V13 all-season fit (dry-season IR included); "
                      "see v13_manifest.json",
         }, out_path, compress=3)

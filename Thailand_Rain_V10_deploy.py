@@ -549,11 +549,17 @@ def phase_predict():
     x = np.concatenate([om.to_numpy(dtype="float32"), ir], axis=1)
     out = grid[["grid_number", "longitude", "latitude"]].copy()
     out["issue_local"] = issue
+    builds, label_versions = set(), set()
     for tname in TARGET_NAMES:
         d = joblib.load(DEPLOY_DIR / f"th_rain_{tname}.joblib")
         prob = d["calibrator"].predict(d["model"].predict_proba(x)[:, 1])
         out[f"p_{tname}"] = np.round(prob, 4)
         out[f"flag_{tname}"] = (prob >= d["threshold"]).astype(int)
+        builds.add(d.get("built", ""))
+        label_versions.add(d.get("label_version", ""))
+    # which fit produced this file (bundles fitted before 2026-10-28 carry neither key)
+    out["model_build"] = min(b for b in builds) if all(builds) else ""
+    out["label_version"] = "|".join(sorted(v for v in label_versions if v))
     # per-cell IR context so the verification loop can compute the labeled V9 health
     # metric (cold235 at issue time joined against next-hour IMERG labels)
     out["hw_cold235_env_lag1"] = np.round(ir[:, 4].astype(float), 4)

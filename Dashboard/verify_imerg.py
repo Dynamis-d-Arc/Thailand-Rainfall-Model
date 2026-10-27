@@ -250,7 +250,10 @@ def score_issue(stamp, issue, csv_path, pmax, rt, done, done_base, clim, thr_map
         if n < MIN_COVERAGE * N_CELLS:
             continue  # labels not fully ingested yet - stays pending
         y = (window[ok] >= thr).any(axis=1).astype(int).to_numpy()
-        common = {"stamp": stamp, "issue_local": issue, "target": name}
+        common = {"stamp": stamp, "issue_local": issue, "target": name,
+                  # fit that produced the file; "" for files written before 2026-10-28
+                  "model_build": str(pred["model_build"].iloc[0])
+                  if "model_build" in pred.columns and pd.notna(pred["model_build"].iloc[0]) else ""}
 
         if need_model:
             p = pred.loc[ok, f"p_{name}"].to_numpy()
