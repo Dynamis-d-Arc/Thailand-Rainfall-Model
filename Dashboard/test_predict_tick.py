@@ -88,6 +88,35 @@ def test_run_that_writes_an_older_hour_is_capped_too():
         assert len(launches) == rs.MAX_LAUNCHES_PER_HOUR
 
 
+def test_rate_limit_holds_local_runs_until_quota_reset():
+    with tempfile.TemporaryDirectory() as tmp:
+        clock = [datetime(2026, 10, 26, 16, 10)]
+        launches, logs = make_env(tmp, clock, ["fail"])
+        real_fake = rs.run_predict
+
+        def fake_429():
+            real_fake()
+            rs.STATUS["last_error"] = "2026-10-26 16:25 predict exited 1: requests.exceptions.HTTPError: 429 Client Error: Too Many Requests"
+
+        rs.run_predict = fake_429
+        rs.save_status = lambda: None
+        state = {"fail_streak": 0, "launched": {}}
+        assert rs.predict_tick(state) == 60 and len(launches) == 1
+        assert state["hold_until"] == datetime(2026, 10, 27, 7, 0)
+        assert rs.STATUS["last_error"] is None and rs.STATUS["predict_hold_until"] == "2026-10-27T07:00"
+        assert "no local runs until 27 Oct 07:00" in logs[-1]
+        for hour in (17, 18, 23):
+            clock[0] = datetime(2026, 10, 26, hour, 10)
+            assert rs.predict_tick(state) == 60
+        clock[0] = datetime(2026, 10, 27, 6, 59)
+        rs.predict_tick(state)
+        assert len(launches) == 1
+        clock[0] = datetime(2026, 10, 27, 7, 10)
+        rs.predict_tick(state)
+        assert len(launches) == 2
+        assert rs.next_quota_reset(datetime(2026, 10, 27, 7, 0)) == datetime(2026, 10, 28, 7, 0)
+
+
 def test_failure_record_keeps_exit_code_and_full_output():
     with tempfile.TemporaryDirectory() as tmp:
         clock = [datetime(2026, 10, 26, 11, 47, 52)]

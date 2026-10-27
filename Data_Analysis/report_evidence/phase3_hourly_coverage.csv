@@ -1,0 +1,7 @@
+era,source,start,end,hours_with_prediction,hours_in_era,coverage_pct
+laptop only (29 Aug to 28 Sep),all sources,2026-08-29 14:00,2026-09-28 16:00,325,722,45.0
+laptop only (29 Aug to 28 Sep),cloud branch only,2026-08-29 14:00,2026-09-28 16:00,0,722,0.0
+laptop + cloud (28 Sep to 27 Oct),all sources,2026-09-28 16:00,2026-10-27 16:00,690,696,99.1
+laptop + cloud (28 Sep to 27 Oct),cloud branch only,2026-09-28 16:00,2026-10-27 16:00,683,696,98.1
+last 30 days to 27 Oct 16:00 (NFR6),all sources,2026-09-27 16:00,2026-10-27 16:00,699,720,97.1
+last 30 days to 27 Oct 16:00 (NFR6),cloud branch only,2026-09-27 16:00,2026-10-27 16:00,683,720,94.9

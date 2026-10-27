@@ -1,0 +1,4 @@
+event,conclusion,runs,median_minutes,first_run_utc,last_run_utc
+schedule,success,137,8.0,2026-09-28 08:51:14+00:00,2026-10-27 09:26:21+00:00
+workflow_dispatch,failure,4,9.1,2026-09-28 08:51:14+00:00,2026-10-27 09:26:21+00:00
+workflow_dispatch,success,619,8.0,2026-09-28 08:51:14+00:00,2026-10-27 09:26:21+00:00

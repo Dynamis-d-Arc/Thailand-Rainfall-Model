@@ -45,6 +45,7 @@ V9_DIR = PROJ / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v9_2026_dec
 DATA = ROOT / "data"
 RUN_MINUTE = 10        # earliest minute past the hour to launch a predict run
 MAX_LAUNCHES_PER_HOUR = 2   # the :10 run plus one retry after the cool-down; the cloud run covers the rest
+QUOTA_RESET_HOUR_BKK = 7    # Open-Meteo's free-tier day resets at 00:00 UTC
 PREDICT_TIMEOUT = 25 * 60
 VERIFY_INTERVAL = 6 * 3600      # how often the IMERG verification loop wakes up
 VERIFY_TIMEOUT = 45 * 60
@@ -454,6 +455,11 @@ def run_predict():
         save_status()
 
 
+def next_quota_reset(now):
+    reset = now.replace(hour=QUOTA_RESET_HOUR_BKK, minute=0, second=0, microsecond=0)
+    return reset if reset > now else reset + timedelta(days=1)
+
+
 def predict_tick(state):
     """One pass of the predict loop; returns the seconds to wait before the next pass.
 
@@ -465,6 +471,8 @@ def predict_tick(state):
     we stop hammering it.
     """
     now = bkk_now()
+    if now < state.get("hold_until", now):
+        return 60                                 # rate-limited: wait for the quota reset
     want = now.strftime("%Y%m%d_%H00")
     if now.minute < RUN_MINUTE or (PRED_DIR / f"v10_predictions_{want}.csv").exists():
         return 60
@@ -475,8 +483,19 @@ def predict_tick(state):
     run_predict()
     with _status_lock:
         failed = STATUS["last_error"] is not None
+        rate_limited = failed and "429 Client Error" in STATUS["last_error"]
     if not failed:
         state["fail_streak"] = 0
+        return 60
+    if rate_limited:
+        # shortcut: the hold lives in memory, so a server restart costs one more attempt before it re-arms
+        state["hold_until"] = next_quota_reset(now)
+        with _status_lock:                        # not an outage: the cloud run covers these hours
+            STATUS["last_error"] = None
+            STATUS["predict_hold_until"] = state["hold_until"].isoformat(timespec="minutes")
+        save_status()
+        log(f"rate-limited by Open-Meteo; no local runs until {state['hold_until']:%d %b %H:%M} "
+            "(cloud predictions keep syncing)")
         return 60
     state["fail_streak"] += 1
     cooldown = min(3600, 600 * state["fail_streak"])

@@ -114,3 +114,29 @@ existed are backfilled automatically on the next cycle.
 Issues whose labels haven't reached GEE yet simply stay pending and are retried
 next cycle. `--no-verify` disables the loop; `--no-predict` disables both loops.
 Requires the machine's persisted Earth Engine login (same as the backfills).
+
+## Bangkok comparison against public weather services
+
+`compare_providers.py` logs, every hour, the rain probability that the live
+model and several public forecast services give for the nine 25 km cells over
+the Bangkok metro area (next 1 / 3 / 6 h), then grades everything against IMERG
+as labels arrive. Open-Meteo's `precipitation_probability` needs no key; Google
+Weather, AccuWeather, WeatherAPI.com, Tomorrow.io and OpenWeatherMap are used
+when a key is present in `provider_keys.json` (copy `provider_keys.example.json`;
+the real file is git-ignored) or the matching environment variable.
+
+A scheduled task, **"Rainwatch Provider Compare"** (registered 2026-09-24,
+hourly at :20 for five days), runs `compare_providers.py run`, which appends to
+`provider_forecasts.csv`, scores whatever has labels into `provider_scores.csv`,
+and rewrites `provider_comparison.md` — a paired table (each provider vs the
+model on identical issue hours and cells, both the cell-max and the
+area-average label) that can be pasted into the report. `python
+Dashboard/compare_providers.py report` prints it. Output lives next to the
+verification logs; `PROVIDER_COMPARE_DIR` redirects it for testing.
+
+Caveats for the write-up: provider probabilities are point forecasts of
+"measurable rain", so they are graded at 0.1 mm only and the area-average label
+is the fairer comparison for them; per-hour probabilities are combined over a
+window as 1 - prod(1 - p); AccuWeather is fetched for the central cell only
+(free tier: 50 calls/day); and the machine's overnight sleep limits the sample
+to hours the model itself ran.

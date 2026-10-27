@@ -1,0 +1,8 @@
+{
+  "_comment": "Copy to Dashboard/provider_keys.json (git-ignored) and fill in the keys you have. Providers without a key are skipped.",
+  "GOOGLE_WEATHER_API_KEY": "",
+  "ACCUWEATHER_API_KEY": "",
+  "WEATHERAPI_KEY": "",
+  "TOMORROW_API_KEY": "",
+  "OPENWEATHERMAP_API_KEY": ""
+}
