@@ -175,7 +175,7 @@ def build_health():
             log(f"health log read failed: {exc}")
     # labeled-live: the verification loop's monthly p(cold-top | observed rain),
     # computed from per-cell IR in the prediction CSVs joined against IMERG labels
-    lab_live = PRED_DIR / "v10_health_labeled_live.csv"
+    lab_live = PRED_DIR / "v10_health_labeled_live_labels_v2.csv"
     if lab_live.exists():
         try:
             df = pd.read_csv(lab_live, parse_dates=["issue_local"])
@@ -198,8 +198,9 @@ def build_verification(stamps):
     """data/verification.json — rolling scores of past predictions vs observed IMERG."""
     payload = {"targets": {}, "window_days": 14, "pending": 0,
                "updated": bkk_now().isoformat(timespec="seconds")}
-    vlog = PRED_DIR / "v10_verification_log.csv"
-    blog = PRED_DIR / "v10_baseline_log.csv"
+    # labels_v2 logs: window [t, t+h) on the wettest-pixel label (verify_imerg.py)
+    vlog = PRED_DIR / "v10_verification_log_labels_v2.csv"
+    blog = PRED_DIR / "v10_baseline_log_labels_v2.csv"
     scored_stamps = set()
     window_start = bkk_now() - timedelta(days=14)
 

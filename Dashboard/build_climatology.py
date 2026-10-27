@@ -2,7 +2,7 @@
 
 For every (grid cell, calendar month, local hour of day) and every deployed target
 (h in 1/3/6 hours x threshold 0.1/1.0 mm) this stores the observed frequency of the
-label "IMERG cell-max >= threshold in ANY of the next h hours" - exactly the label
+label "IMERG pixel-max >= threshold in ANY of the h hours starting at the issue hour" - the label
 definition verify_imerg.py scores the live model against.
 
 The climatology is the "no-skill" reference: a forecaster who knows only where,
@@ -29,10 +29,12 @@ import psycopg2
 ROOT = Path(__file__).resolve().parent
 PROJ = ROOT.parent
 PRED_DIR = PROJ / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v10_deploy"
-OUT = PRED_DIR / "v10_climatology.csv.gz"
-META = PRED_DIR / "v10_climatology_meta.json"
+LABEL_VERSION = "labels_v2"          # window [t, t+h) on the wettest pixel's hourly total
+OUT = PRED_DIR / f"v10_climatology_{LABEL_VERSION}.csv.gz"
+META = PRED_DIR / f"v10_climatology_{LABEL_VERSION}_meta.json"
 
 IMERG_TABLE = '"IMERG_THAILAND_DATA"'
+IMERG_LABEL_COLUMN = "precipitation_pixelmax_mm"
 HIST_LO = "2024-07-01 00:00:00"
 HIST_HI = "2026-08-01 00:00:00"      # exclusive
 TARGETS = [(1, 0.1), (3, 0.1), (6, 0.1), (1, 1.0), (3, 1.0), (6, 1.0)]
@@ -52,13 +54,13 @@ def log(msg):
 
 
 def load_pmax():
-    """grid x hourly-local-time matrix of precipitation_max_mm (NaN = missing hour)."""
+    """grid x hourly-local-time matrix of IMERG_LABEL_COLUMN (NaN = missing hour)."""
     conn = psycopg2.connect(**DB_CONFIG)
     try:
         cur = conn.cursor(name="clim_cur")
         cur.itersize = 500_000
         cur.execute(
-            f"SELECT grid_number, local_observation_time, precipitation_max_mm "
+            f"SELECT grid_number, local_observation_time, {IMERG_LABEL_COLUMN} "
             f"FROM {IMERG_TABLE} WHERE is_complete_hour "
             f"AND local_observation_time >= %s AND local_observation_time < %s",
             (HIST_LO, HIST_HI))
@@ -83,13 +85,12 @@ def load_pmax():
 
 
 def forward_window_max(values, h):
-    """max over columns t+1..t+h for each t; NaN where any of those hours is missing."""
+    """max over columns t..t+h-1 for each t (the window starts AT t); NaN where any is missing."""
     n_cells, n_t = values.shape
     out = np.full((n_cells, n_t), np.nan)
-    ok = np.ones((n_cells, n_t), dtype=bool)
     stack = np.full((h, n_cells, n_t), np.nan)
-    for k in range(1, h + 1):
-        stack[k - 1, :, :n_t - k] = values[:, k:]
+    for k in range(h):
+        stack[k, :, :n_t - k] = values[:, k:]
     ok = ~np.isnan(stack).any(axis=0)
     with np.errstate(all="ignore"):
         mx = np.nanmax(np.where(np.isnan(stack), -np.inf, stack), axis=0)
@@ -147,7 +148,9 @@ def main():
         "history": [HIST_LO[:10], "2026-07-31"],
         "pool_hours": POOL_HOURS,
         "rows": int(len(out)),
-        "label": "IMERG precipitation_max_mm >= thr in ANY of next h hours, complete hours only",
+        "label": f"IMERG {IMERG_LABEL_COLUMN} >= thr in ANY of the h hours starting at t "
+                 "(window [t, t+h)), complete hours only",
+        "label_version": LABEL_VERSION,
         "samples_per_bin_median": int(np.median(out["n_h1_0.1mm"])),
     }
     META.write_text(json.dumps(meta, indent=1))

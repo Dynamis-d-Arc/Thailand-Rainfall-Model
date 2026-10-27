@@ -6,8 +6,13 @@ at the cell centre *is* the cell. A 25 km Thailand cell spans ~5-6 IMERG pixels,
 point sample would reintroduce the point-vs-cell mismatch that capped the V5 gauge
 gain. Every hour therefore carries both a cell-mean and a cell-max reduction:
 
-    precipitation_mm      cell-average accumulation  -> "how much fell over the cell"
-    precipitation_max_mm  wettest-pixel accumulation -> "did it rain anywhere in the cell"
+    precipitation_mm          cell-average accumulation  -> "how much fell over the cell"
+    precipitation_max_mm      0.5*max(first half-hour rate) + 0.5*max(second half-hour rate);
+                              the two maxima may sit on different pixels, so this is an UPPER
+                              BOUND on the wettest pixel's hourly total (kept as fetched)
+    precipitation_pixelmax_mm wettest-pixel hourly total: per-pixel 0.5*a + 0.5*b, then the
+                              cell max -> "did it rain anywhere in the cell" (label since
+                              2026-10-27; backfill_imerg_pixelmax.py fills history)
 
 The modelling step picks which one defines the label; storing both means that choice
 does not require a refetch. pixel_count records how many unmasked IMERG pixels the
@@ -43,6 +48,7 @@ CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
     timezone text NOT NULL DEFAULT 'Asia/Bangkok',
     precipitation_mm double precision,
     precipitation_max_mm double precision,
+    precipitation_pixelmax_mm double precision,
     precipitation_rate_mean_mm_h double precision,
     precipitation_rate_max_mm_h double precision,
     precipitation_rate_first_half_hour_mm_h double precision,
@@ -69,6 +75,8 @@ CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
     CONSTRAINT imerg_thailand_max_rate_check
         CHECK (precipitation_rate_max_mm_h IS NULL OR precipitation_rate_max_mm_h >= 0)
 );
+
+ALTER TABLE {TABLE_NAME} ADD COLUMN IF NOT EXISTS precipitation_pixelmax_mm double precision;
 
 CREATE INDEX IF NOT EXISTS imerg_thailand_data_observation_time_idx
     ON {TABLE_NAME} (observation_time);

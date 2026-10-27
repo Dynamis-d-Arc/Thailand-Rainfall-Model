@@ -68,6 +68,12 @@ CACHE.mkdir(parents=True, exist_ok=True)
 HORIZONS = [1, 3, 6]
 RAIN_THRESHOLDS_MM = [0.1, 1.0]
 MAX_LEAD = max(HORIZONS)
+# Label window for horizon h is [t, t+h): IMERG rows are stamped by the START of the hour they
+# cover, so lead 0 is the hour that begins at issue time t. Until 2026-10-27 both panel loaders
+# used leads 1..h, i.e. [t+1, t+1+h), one hour later than the "next h hours" wording; every
+# trained_models/ dir without a _labels_v2 suffix was fitted on that window. The live deploy
+# publishes about 13-20 min after t, so part of lead 0 has already elapsed at publication.
+LEAD_HOURS = list(range(MAX_LEAD))
 MODEL_PLAN = {1: "lightgbm", 3: "hist_gradient_boosting", 6: "hist_gradient_boosting"}
 PROBABILITY_THRESHOLDS_TO_TEST = np.arange(0.05, 0.96, 0.05)
 RANDOM_STATE = 42
@@ -187,11 +193,11 @@ def build_panel_query():
     lead_sql = ",\n            ".join(
         f"LEAD(precipitation_mm, {k}) OVER w AS p{k}, "
         f"LEAD(local_observation_time, {k}) OVER w AS t{k}"
-        for k in range(1, MAX_LEAD + 1))
+        for k in LEAD_HOURS)
     guarded_sql = ",\n        ".join(
         f"CASE WHEN im.t{k} = im.t_local + interval '{k} hour' "
         f"THEN im.p{k}::real ELSE 'NaN'::real END AS p{k}"
-        for k in range(1, MAX_LEAD + 1))
+        for k in LEAD_HOURS)
     return f"""
     WITH im AS (
         SELECT grid_number, local_observation_time AS t_local,

@@ -51,10 +51,16 @@ ROOT = Path(__file__).resolve().parent
 PROJ = ROOT.parent
 PRED_DIR = PROJ / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v10_deploy"
 FETCH_SCRIPT = PROJ / "IMERG_Script" / "fetch_imerg_thailand_data_gee.py"
-VERIF_LOG = PRED_DIR / "v10_verification_log.csv"
-HEALTH_LABELED_LOG = PRED_DIR / "v10_health_labeled_live.csv"
-BASELINE_LOG = PRED_DIR / "v10_baseline_log.csv"
-CLIM_PATH = PRED_DIR / "v10_climatology.csv.gz"     # from Dashboard/build_climatology.py
+# Label set version (2026-10-27): window [issue, issue+h) on precipitation_pixelmax_mm, the
+# wettest pixel's hourly total. The logs without a suffix hold the earlier scoring, which used
+# [issue+1, issue+1+h) on precipitation_max_mm (an upper bound on the pixel total); they are
+# kept as history and never rewritten. Both sets grade the same prediction files.
+LABEL_VERSION = "labels_v2"
+IMERG_LABEL_COLUMN = "precipitation_pixelmax_mm"
+VERIF_LOG = PRED_DIR / f"v10_verification_log_{LABEL_VERSION}.csv"
+HEALTH_LABELED_LOG = PRED_DIR / f"v10_health_labeled_live_{LABEL_VERSION}.csv"
+BASELINE_LOG = PRED_DIR / f"v10_baseline_log_{LABEL_VERSION}.csv"
+CLIM_PATH = PRED_DIR / f"v10_climatology_{LABEL_VERSION}.csv.gz"   # Dashboard/build_climatology.py
 DEPLOY_DIR = PRED_DIR / "deploy"
 
 IMERG_TABLE = '"IMERG_THAILAND_DATA"'
@@ -63,11 +69,11 @@ MIN_COVERAGE = 0.98      # score a target only when >=98% of cells have full lab
 MAX_LEAD = 6
 
 # Reference forecasts scored on the same (issue, target, cells) as the model:
-#   persistence  - the last `horizon` observed hours ending at issue time; the score is
-#                  their IMERG cell-max (mm) and the flag is "score >= rain threshold",
-#                  i.e. "it is raining now, so it will rain". Uses observed IMERG at
-#                  issue time, which the live model never has (4h+ latency) - this is a
-#                  skill reference, not a deployable forecast.
+#   persistence  - the last `horizon` observed hours ending AT the issue hour, [issue-h,
+#                  issue); the score is their IMERG pixel-max (mm) and the flag is
+#                  "score >= rain threshold", i.e. "it just rained, so it will rain". Uses
+#                  observed IMERG up to issue time, which the live model never has (4h+
+#                  latency) - this is a skill reference, not a deployable forecast.
 #   climatology  - per-cell, per-month, per-hour-of-day observed label frequency from
 #                  2024-07..2026-07 (build_climatology.py); flagged with the same
 #                  probability threshold as the deployed model for that target.
@@ -188,17 +194,26 @@ def run_fetch(start_date, end_date):
         raise RuntimeError(f"IMERG fetch exited {r.returncode}")
 
 
+def lead_hours(issue):
+    """Label hours of the 6 h window starting AT the issue hour: [issue, issue+6)."""
+    return [issue + timedelta(hours=k) for k in range(MAX_LEAD)]
+
+
+def hist_hours(issue):
+    """The 6 observed hours before the issue hour, oldest first: [issue-6, issue)."""
+    return [issue - timedelta(hours=k) for k in range(MAX_LEAD, 0, -1)]
+
+
 def load_labels(conn, lo, hi):
-    """precipitation_max_mm pivot (grid x local hour) over [lo, hi], complete hours only."""
+    """IMERG_LABEL_COLUMN pivot (grid x local hour) over [lo, hi], complete hours only."""
     df = pd.read_sql(
-        f"SELECT grid_number, local_observation_time, precipitation_max_mm, run_type "
+        f"SELECT grid_number, local_observation_time, {IMERG_LABEL_COLUMN} AS label_mm, run_type "
         f"FROM {IMERG_TABLE} WHERE is_complete_hour "
         f"AND local_observation_time BETWEEN %s AND %s",
         conn, params=(lo, hi))
     if df.empty:
         return None, None
-    pmax = df.pivot(index="grid_number", columns="local_observation_time",
-                    values="precipitation_max_mm")
+    pmax = df.pivot(index="grid_number", columns="local_observation_time", values="label_mm")
     rt = df.pivot(index="grid_number", columns="local_observation_time", values="run_type")
     return pmax, rt
 
@@ -209,8 +224,7 @@ def score_issue(stamp, issue, csv_path, pmax, rt, done, done_base, clim, thr_map
     Returns (model_rows, baseline_rows, health_row_or_None).
     """
     pred = pd.read_csv(csv_path).set_index("grid_number")
-    lead_hours = [issue + timedelta(hours=k) for k in range(1, MAX_LEAD + 1)]
-    hist_hours = [issue - timedelta(hours=k) for k in range(MAX_LEAD - 1, -1, -1)]
+    leads, hist_hrs = lead_hours(issue), hist_hours(issue)
     rows, base_rows, health = [], [], None
     now_str = bkk_now().strftime("%Y-%m-%d %H:%M")
 
@@ -221,7 +235,7 @@ def score_issue(stamp, issue, csv_path, pmax, rt, done, done_base, clim, thr_map
             m[h] = pmax[h].reindex(pred.index) if (pmax is not None and h in pmax.columns) \
                 else np.nan
         return m
-    lead, hist = aligned(lead_hours), aligned(hist_hours)
+    lead, hist = aligned(leads), aligned(hist_hrs)
 
     for name, horizon, thr in targets_from_columns(pred.columns):
         need_model = (stamp, name) not in done
@@ -230,7 +244,7 @@ def score_issue(stamp, issue, csv_path, pmax, rt, done, done_base, clim, thr_map
             need_base["climatology"] = False
         if not need_model and not any(need_base.values()):
             continue
-        window = lead[lead_hours[:horizon]]
+        window = lead[leads[:horizon]]
         ok = window.notna().all(axis=1)
         n = int(ok.sum())
         if n < MIN_COVERAGE * N_CELLS:
@@ -243,7 +257,7 @@ def score_issue(stamp, issue, csv_path, pmax, rt, done, done_base, clim, thr_map
             f = pred.loc[ok, f"flag_{name}"].to_numpy().astype(int)
             prov = np.nan
             if rt is not None:
-                used = rt.reindex(index=pred.index[ok], columns=lead_hours[:horizon])
+                used = rt.reindex(index=pred.index[ok], columns=leads[:horizon])
                 vals = used.to_numpy().ravel()
                 vals = vals[pd.notna(vals)]
                 if len(vals):
@@ -266,7 +280,7 @@ def score_issue(stamp, issue, csv_path, pmax, rt, done, done_base, clim, thr_map
 
         if need_base["persistence"]:
             # the last `horizon` observed hours ending at issue time, same cells as ok
-            recent = hist[hist_hours[-horizon:]]
+            recent = hist[hist_hrs[-horizon:]]
             ok_p = ok & recent.notna().all(axis=1)
             if int(ok_p.sum()) >= MIN_COVERAGE * N_CELLS:
                 y_p = (window[ok_p] >= thr).any(axis=1).astype(int).to_numpy()
@@ -340,8 +354,8 @@ def main():
         print("VERIFY_SUMMARY " + json.dumps({"scored": 0, "pending": 0}))
         return
 
-    # labels for the lead window plus the MAX_LEAD-1 hours before issue (persistence)
-    lo = min(t for _, t, _ in pending) - timedelta(hours=MAX_LEAD - 1)
+    # labels for the lead window plus the MAX_LEAD hours before issue (persistence)
+    lo = min(t for _, t, _ in pending) - timedelta(hours=MAX_LEAD)
     hi = max(t for _, t, _ in pending) + timedelta(hours=MAX_LEAD)
     if not args.no_fetch:
         # local (ICT, UTC+7) label hours span these UTC dates; fetcher takes UTC dates

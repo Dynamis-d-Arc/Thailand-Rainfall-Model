@@ -52,7 +52,7 @@ import pandas as pd
 import psycopg2
 
 from BKK_Rain_V3 import (
-    FEATURE_COLUMNS, MAX_LEAD, MIN_FOLD_ROWS, MODEL_PLAN, PROJECT_ROOT,
+    FEATURE_COLUMNS, LEAD_HOURS, MAX_LEAD, MIN_FOLD_ROWS, MODEL_PLAN, PROJECT_ROOT,
     PURGE_HOURS, RANDOM_STATE, TARGETS, TARGET_NAMES,
     fit_predict_calibrated, log, purged_train_mask, score_probabilities,
 )
@@ -71,13 +71,21 @@ DB_CONFIG = {
 
 PRECOMPUTE_TABLE_NAME = '"OM_THAILAND_DATA_PRECOMPUTE"'
 IMERG_TABLE_NAME = '"IMERG_THAILAND_DATA"'
-OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v3"
-CACHE = Path(os.getenv("TH_CACHE", str(PROJECT_ROOT / "ML_Model_V2" / "_th_cache")))
+# Label set version. "labels_v2" (2026-10-27) = window [t, t+h) on the wettest pixel's hourly
+# total. Every experiment keyed off this module writes to a *_labels_v2 output dir and uses
+# the _th_cache_labels_v2 fold cache, so nothing fitted on the old labels is overwritten and
+# no old cache is reused. The Himawari day files are label-independent: junction or move
+# _th_cache/himawari into the new cache dir (see Docs/label_fix_2026-10-27.md).
+LABEL_VERSION = "labels_v2"
+OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / f"om_thailand_rain_v3_{LABEL_VERSION}"
+CACHE = Path(os.getenv("TH_CACHE", str(PROJECT_ROOT / "ML_Model_V2" / f"_th_cache_{LABEL_VERSION}")))
 CACHE.mkdir(parents=True, exist_ok=True)
 
-# "rain anywhere in the 25 km cell". IMERG_THAILAND_DATA also carries precipitation_mm
-# (cell mean, 17.8% wet vs 26.9% for the max) if the cell-average definition is ever wanted.
-IMERG_LABEL_COLUMN = "precipitation_max_mm"
+# "rain anywhere in the 25 km cell": the wettest pixel's hourly total. precipitation_max_mm
+# (the pre-2026-10-27 label) is 0.5*max(a) + 0.5*max(b) over the two half-hours and can take
+# its maxima from different pixels, so it over-states the label (3.4% of its 1.0 mm positives
+# on five sampled days). IMERG_THAILAND_DATA also carries precipitation_mm (cell mean).
+IMERG_LABEL_COLUMN = "precipitation_pixelmax_mm"
 
 HOUR_STRIDE = 4          # keep local hours 0, 4, 8, 12, 16, 20 — diurnally balanced
 BLOCK_MONTHS = 2         # CV fold width
@@ -120,17 +128,17 @@ def build_panel_query():
     lead_sql = ",\n            ".join(
         f"LEAD({IMERG_LABEL_COLUMN}, {k}) OVER w AS p{k}, "
         f"LEAD(local_observation_time, {k}) OVER w AS t{k}"
-        for k in range(1, MAX_LEAD + 1))
+        for k in LEAD_HOURS)
     guarded_sql = ",\n        ".join(
         f"CASE WHEN im.t{k} = im.t_local + interval '{k} hour' "
         f"THEN im.p{k}::real ELSE 'NaN'::real END AS p{k}"
-        for k in range(1, MAX_LEAD + 1))
+        for k in LEAD_HOURS)
     return f"""
     WITH im AS (
         SELECT grid_number, local_observation_time AS t_local, run_type,
             {lead_sql}
         FROM {IMERG_TABLE_NAME}
-        WHERE is_complete_hour
+        WHERE is_complete_hour AND {IMERG_LABEL_COLUMN} IS NOT NULL
         WINDOW w AS (PARTITION BY grid_number ORDER BY local_observation_time)
     )
     SELECT om.grid_number, om.local_forecast_time,
@@ -149,7 +157,8 @@ def count_panel_rows(conn):
         cur.execute(f"""
             SELECT count(*) FROM {PRECOMPUTE_TABLE_NAME} om
             JOIN (SELECT grid_number, local_observation_time AS t_local
-                  FROM {IMERG_TABLE_NAME} WHERE is_complete_hour) im
+                  FROM {IMERG_TABLE_NAME}
+                  WHERE is_complete_hour AND {IMERG_LABEL_COLUMN} IS NOT NULL) im
               ON im.grid_number = om.grid_number AND im.t_local = om.local_forecast_time
             WHERE {ROW_FILTER_SQL}""")
         return int(cur.fetchone()[0])
@@ -418,11 +427,17 @@ def phase_report():
     (OUTPUT_DIR / "th_v3_metadata.json").write_text(json.dumps({
         "purpose": "nationwide Thailand baseline under the V3 protocol, graded on observed "
                    "IMERG instead of the ERA5 precipitation column the features come from",
-        "label": f"{IMERG_LABEL_COLUMN} (cell-max over the 25 km footprint)",
+        "label": f"{IMERG_LABEL_COLUMN} (wettest-pixel hourly total over the 25 km footprint)",
+        "label_version": LABEL_VERSION,
+        "window": "[t, t+h): lead 0 is the IMERG hour that starts at the issue hour",
+        "lead_hours": LEAD_HOURS,
         "hour_stride": HOUR_STRIDE,
         "cv": f"leave-one-{BLOCK_MONTHS}-month-block-out, {PURGE_HOURS} h purge",
         "features": FEATURE_COLUMNS,
         "caveats": [
+            "labels_v2 (2026-10-27): window [t, t+h) on precipitation_pixelmax_mm. The "
+            "unsuffixed om_thailand_rain_v3/ outputs used [t+1, t+1+h) on precipitation_max_mm "
+            "(0.5*max(a)+0.5*max(b), an upper bound) and are kept as history.",
             "39% of rows are provisional (Late Run) IMERG; see the run_type breakout.",
             "Features are ERA5 reanalysis (source_api=open_meteo_historical_weather), so "
             "these scores are an upper bound on what a forecast-fed deployment would reach.",

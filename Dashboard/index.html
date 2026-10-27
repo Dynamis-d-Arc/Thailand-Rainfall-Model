@@ -876,12 +876,14 @@
       if (t.provisional_share != null && t.provisional_share > 0.5)
         foot += " · provisional Late Run labels";
       if (VDATA.pending) foot += ` · ${VDATA.pending} awaiting labels`;
-      foot += ". POD = share of observed rain the alerts caught; FAR = share of alerts " +
-        "that were dry; Brier = probability error (lower is better).";
+      foot += ". +h = the h hours starting at the issue hour (a prediction appears about " +
+        "13-20 min into that window). POD = share of observed rain the alerts caught; FAR = " +
+        "share of alerts that were dry; Brier = probability error (lower is better).";
       if (t.baselines)
-        foot += " Persistence = \"raining now, so it will rain\" using observed IMERG at " +
-          "issue time (which the live model never has); climatology = the cell's usual " +
-          "wet frequency for this month and hour, flagged at the model's own threshold.";
+        foot += " Persistence = \"it rained in the hour before issue, so it will rain\" using " +
+          "observed IMERG up to the issue hour (which the live model never has); climatology = " +
+          "the cell's usual wet frequency for this month and hour, flagged at the model's own " +
+          "threshold.";
     }
     if (VDATA.imerg_lag_days != null && VDATA.imerg_lag_days > 2) {
       foot += ` ⚠ IMERG feed is ${VDATA.imerg_lag_days.toFixed(1)} days behind ` +

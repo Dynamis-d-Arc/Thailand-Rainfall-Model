@@ -79,32 +79,44 @@ The server merges both into `Dashboard/data/health.json` at every conversion.
 
 `verify_imerg.py` closes the observation loop: every 6 h the server grades all
 mature predictions (issue + 6 h + 7 h IMERG-latency margin) against observed
-rain, using the exact training label — IMERG cell-max hourly rain
-(`precipitation_max_mm`, complete hours) ≥ threshold in ANY of the next h hours.
+rain, using the exact training label — the wettest IMERG pixel's hourly total
+(`precipitation_pixelmax_mm`, complete hours) ≥ threshold in ANY of the h hours
+starting at the issue hour, i.e. the window [t, t+h). A prediction for issue
+hour t is published about 13–20 minutes after t (laptop runs from :10, the
+cloud job from :15, ~2.4 min per run), so the first quarter-hour of the +1 h
+window has already elapsed when it appears.
+
+Label history: until 2026-10-27 the loop scored the window [t+1, t+1+h) on
+`precipitation_max_mm`, which is 0.5·max(first half-hour) + 0.5·max(second
+half-hour) over possibly different pixels and over-states the pixel total.
+Those scores stay in `v10_verification_log.csv`, `v10_baseline_log.csv` and
+`v10_health_labeled_live.csv` as history and are never rewritten; the corrected
+rescoring of the same prediction files lives in the `*_labels_v2.csv` logs,
+which the dashboard now reads. The two sets must not be compared with each
+other. See `Docs/label_fix_2026-10-27.md`.
 
 Per run it tops up `"IMERG_THAILAND_DATA"` via the Earth Engine fetcher
 (idempotent), then appends per-(issue, target) scores — Brier, ROC-AUC, and the
-alert confusion (POD/FAR/CSI) — to `v10_verification_log.csv`, and extends the
+alert confusion (POD/FAR/CSI) — to `v10_verification_log_labels_v2.csv`, and extends the
 labeled V9 health metric from the per-cell `hw_cold235_env_lag1` column the
 predict phase now writes into each prediction CSV
-(`v10_health_labeled_live.csv`). The dashboard shows the rolling 14-day skill
+(`v10_health_labeled_live_labels_v2.csv`). The dashboard shows the rolling 14-day skill
 for the active layer ("Skill vs observed rain") and plots live-labeled months
 as hollow points on the IR-health chart.
 
 The same run also scores two reference forecasts on exactly the same (issue,
-target, cells) and appends them to `v10_baseline_log.csv`, so the model's live
+target, cells) and appends them to `v10_baseline_log_labels_v2.csv`, so the model's live
 numbers read as a lift rather than a bare score:
 
-- **persistence** — the last h observed hours ending at issue time (IMERG
-  cell-max in mm; flag = "≥ threshold now"). It uses observed rain *at issue
-  time*, which the live model never has (IMERG latency 4 h+), so it is the
-  observation ceiling, not a competitor. It beats the model at +1 h and loses by
-  +6 h.
+- **persistence** — the last h observed hours ending at the issue hour, the
+  window [t-h, t) (IMERG pixel-max in mm; flag = "≥ threshold in that window").
+  It uses observed rain *up to issue time*, which the live model never has
+  (IMERG latency 4 h+), so it is the observation ceiling, not a competitor.
 - **climatology** — the cell's observed label frequency for this calendar month
   and hour of day (±1 h pooled) from IMERG 2024-07..2026-07, flagged at the
   deployed model's own probability threshold. The no-skill floor. Built once by
-  `build_climatology.py` into `v10_climatology.csv.gz`; rebuild after a major
-  IMERG backfill.
+  `build_climatology.py` into `v10_climatology_labels_v2.csv.gz`; rebuild after
+  a major IMERG backfill.
 
 The "Skill vs observed rain" panel shows a model / persistence / climatology
 table for the active layer; a reference cell is green where the model beats
@@ -127,8 +139,9 @@ the real file is git-ignored) or the matching environment variable.
 
 A scheduled task, **"Rainwatch Provider Compare"** (registered 2026-09-24,
 hourly at :20 for five days), runs `compare_providers.py run`, which appends to
-`provider_forecasts.csv`, scores whatever has labels into `provider_scores.csv`,
-and rewrites `provider_comparison.md` — a paired table (each provider vs the
+`provider_forecasts.csv`, scores whatever has labels into
+`provider_scores_labels_v2.csv`, and rewrites `provider_comparison_labels_v2.md`
+— a paired table (each provider vs the
 model on identical issue hours and cells, both the cell-max and the
 area-average label) that can be pasted into the report. `python
 Dashboard/compare_providers.py report` prints it. Output lives next to the
@@ -136,7 +149,11 @@ verification logs; `PROVIDER_COMPARE_DIR` redirects it for testing.
 
 Caveats for the write-up: provider probabilities are point forecasts of
 "measurable rain", so they are graded at 0.1 mm only and the area-average label
-is the fairer comparison for them; per-hour probabilities are combined over a
-window as 1 - prod(1 - p); AccuWeather is fetched for the central cell only
+is the fairer comparison for them; a provider's hourly value refers to the
+preceding hour, so hours 1..h cover the label window [issue, issue+h) and the
+1 h rows are the primary comparison; multi-hour provider rows are reported as
+bounds on P(any rain in the window) — `[max]` (max of the hourly values, lower
+bound) and `[1-prod]` (independence product, upper bound) — because the hourly
+marginals do not determine that probability; AccuWeather is fetched for the central cell only
 (free tier: 50 calls/day); and the machine's overnight sleep limits the sample
 to hours the model itself ran.

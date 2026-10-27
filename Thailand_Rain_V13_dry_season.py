@@ -37,7 +37,8 @@ import Thailand_Rain_V3 as v3
 from Thailand_Rain_V7_himawari_ir import himawari_feature_names
 from Thailand_Rain_V10_deploy import ALL_FEATURES, fit_full, PROJECT_ROOT
 
-OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v13_allseason"
+OUTPUT_DIR = (PROJECT_ROOT / "ML_Model_V2" / "trained_models"
+              / f"om_thailand_rain_v13_allseason_{v3.LABEL_VERSION}")
 DEPLOY_DIR = OUTPUT_DIR / "deploy"
 CONFIG = "hw_allseason"
 DRY_MONTHS = {11, 12, 1, 2, 3, 4}

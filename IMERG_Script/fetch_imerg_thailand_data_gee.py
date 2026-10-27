@@ -18,6 +18,11 @@ The second difference is the reduction itself. A 25 km cell spans ~5-6 IMERG pix
 so each half-hour is reduced with mean AND max over the cell footprint (see
 DB_Script/create_imerg_thailand_data_table.py for why both are stored).
 
+precipitation_pixelmax_mm (added 2026-10-27) is the wettest pixel's HOURLY total: the two
+half-hour rates are accumulated per pixel first (hourly_sum_bands) and the cell max is taken
+of that. precipitation_max_mm keeps the original 0.5*max(a) + 0.5*max(b), whose maxima can
+come from different pixels and therefore over-states that total.
+
 Usage:
     python IMERG_Script/fetch_imerg_thailand_data_gee.py --schema-only
     python IMERG_Script/fetch_imerg_thailand_data_gee.py --limit-chunks 3   # pilot
@@ -86,6 +91,7 @@ INSERT INTO {OUTPUT_TABLE} (
     timezone,
     precipitation_mm,
     precipitation_max_mm,
+    precipitation_pixelmax_mm,
     precipitation_rate_mean_mm_h,
     precipitation_rate_max_mm_h,
     precipitation_rate_first_half_hour_mm_h,
@@ -107,6 +113,7 @@ ON CONFLICT (grid_number, observation_time) DO UPDATE SET
     timezone = EXCLUDED.timezone,
     precipitation_mm = EXCLUDED.precipitation_mm,
     precipitation_max_mm = EXCLUDED.precipitation_max_mm,
+    precipitation_pixelmax_mm = EXCLUDED.precipitation_pixelmax_mm,
     precipitation_rate_mean_mm_h = EXCLUDED.precipitation_rate_mean_mm_h,
     precipitation_rate_max_mm_h = EXCLUDED.precipitation_rate_max_mm_h,
     precipitation_rate_first_half_hour_mm_h = EXCLUDED.precipitation_rate_first_half_hour_mm_h,
@@ -343,14 +350,48 @@ def chunk_band_metadata(ee, collection):
     return band_map
 
 
-def reduce_chunk(ee, collection, cells_fc, scale):
+def hourly_sum_bands(ee, stacked, band_map):
+    """One band per complete UTC hour: per-pixel 0.5*first-half rate + 0.5*second-half rate (mm).
+
+    Returns (images, {band_name: (hour_utc, first_half_band, second_half_band)}). Hours with a
+    missing half-hour get no band, so their pixel max stays NULL like the other hourly columns.
+    """
+    halves = {}
+    for band, (stamp, _status) in band_map.items():
+        halves.setdefault(stamp.replace(minute=0, second=0, microsecond=0), {})[stamp.minute] = band
+    images, hours = [], {}
+    for hour, parts in sorted(halves.items()):
+        if set(parts) != {0, 30}:
+            continue
+        name = f"hour_{hour:%Y%m%d%H}"
+        images.append(stacked.select(parts[0]).multiply(0.5)
+                      .add(stacked.select(parts[30]).multiply(0.5)).rename(name))
+        hours[name] = (hour, parts[0], parts[30])
+    return images, hours
+
+
+def hourly_pixel_max(first_half_rate, second_half_rate):
+    """Wettest-pixel hourly total from two half-hour rate arrays (mm/h -> mm).
+
+    Accumulate per pixel first, then take the spatial max. This is the numpy reference for
+    the Earth Engine expression in hourly_sum_bands; backfill_imerg_pixelmax.py --check
+    compares the two on real pixels.
+    """
+    total = (0.5 * np.asarray(first_half_rate, dtype=float)
+             + 0.5 * np.asarray(second_half_rate, dtype=float))
+    return float(np.nanmax(total))
+
+
+def reduce_chunk(ee, collection, cells_fc, scale, band_map):
     reducer = (
         ee.Reducer.mean()
         .combine(ee.Reducer.max(), sharedInputs=True)
         .combine(ee.Reducer.count(), sharedInputs=True)
     )
     stacked = collection.toBands()
-    reduced = stacked.reduceRegions(collection=cells_fc, reducer=reducer, scale=scale)
+    hourly, _ = hourly_sum_bands(ee, stacked, band_map)
+    image = ee.Image.cat([stacked] + hourly) if hourly else stacked
+    reduced = image.reduceRegions(collection=cells_fc, reducer=reducer, scale=scale)
     info = with_retries("reduceRegions", reduced.getInfo)
     return info.get("features", [])
 
@@ -400,6 +441,7 @@ def rows_from_features(features, cells_by_number, band_map):
 
             half_hour_count = min(len(means), 2)
             complete = half_hour_count == 2
+            pixelmax = finite_or_none(props.get(f"hour_{hour:%Y%m%d%H}_max"))
             statuses = sorted(s for s in slot["status"] if s and s != "unknown")
             if not statuses:
                 run_type = "unknown"
@@ -420,6 +462,7 @@ def rows_from_features(features, cells_by_number, band_map):
                     TIMEZONE_NAME,
                     float(sum(r * 0.5 for r in means[:2])) if complete else None,
                     float(sum(r * 0.5 for r in maxes[:2])) if complete else None,
+                    pixelmax if complete else None,
                     float(np.mean(means)) if means else None,
                     float(np.max(maxes)) if maxes else None,
                     first_rate,
@@ -571,14 +614,14 @@ def main():
                     f"no images; skipped.")
                 continue
 
-            features = reduce_chunk(ee, collection, cells_fc, args.scale)
+            features = reduce_chunk(ee, collection, cells_fc, args.scale, band_map)
             t_gee = time_module.time() - t0
             rows = rows_from_features(features, cells_by_number, band_map)
             written = upsert_rows(conn, rows)
             total_upserted += written
             processed_chunks += 1
 
-            complete_in_result = sum(row[15] == 2 for row in rows)
+            complete_in_result = sum(row[16] == 2 for row in rows)
             elapsed = time_module.time() - run_started
             rate_days = (processed_chunks * args.chunk_days) / max(elapsed / 3600, 1e-9)
             log(f"Chunk {chunk_number}/{len(chunks)} {chunk_start}..{chunk_end}: "

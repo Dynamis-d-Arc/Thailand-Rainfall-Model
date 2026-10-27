@@ -11,6 +11,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -20,6 +21,9 @@ ROOT = Path(__file__).resolve().parents[1]
 DEPLOY = ROOT / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v10_deploy"
 OUT = Path(__file__).resolve().parent / "report_evidence"
 TARGETS = ["h1_0.1mm", "h1_1.0mm", "h3_0.1mm", "h3_1.0mm", "h6_0.1mm", "h6_1.0mm"]
+# label-dependent figures read the labels_v2 logs (window [t, t+h), wettest-pixel label) and
+# write *_labels_v2.csv; the unsuffixed phase3 files are the pre-fix evidence, kept as is
+LABELS = "labels_v2"
 
 # eras of the live service (Bangkok local issue hours)
 LAPTOP_ERA = ("2026-08-29 14:00", "2026-09-28 16:00")   # dashboard launch -> cloud job
@@ -39,8 +43,8 @@ def git_stamps(ref, path=""):
 
 
 def live_skill():
-    v = pd.read_csv(DEPLOY / "v10_verification_log.csv")
-    b = pd.read_csv(DEPLOY / "v10_baseline_log.csv")
+    v = pd.read_csv(DEPLOY / f"v10_verification_log_{LABELS}.csv")
+    b = pd.read_csv(DEPLOY / f"v10_baseline_log_{LABELS}.csv")
     m = v.rename(columns={"roc_auc": "model_roc", "brier": "model_brier"})
     p = b[b.baseline == "persistence"][["stamp", "target", "roc_auc", "brier"]] \
         .rename(columns={"roc_auc": "persistence_roc", "brier": "persistence_brier"})
@@ -67,14 +71,14 @@ def live_skill():
             "model_csi": round(d.csi.mean(), 2),
             "provisional_label_share": round(d.provisional_share.mean(), 3),
         })
-    save(pd.DataFrame(rows), "phase3_live_skill_vs_baselines.csv")
+    save(pd.DataFrame(rows), f"phase3_live_skill_vs_baselines_{LABELS}.csv")
     # model only, every verified issue hour (starts 11 Aug, before the baselines existed)
     g = v.groupby("target")
     save(pd.DataFrame({"target": g.size().index, "issue_hours": g.size().values,
                        "first_issue": g.issue_local.min().values, "last_issue": g.issue_local.max().values,
                        "model_roc": g.roc_auc.mean().round(3).values,
                        "model_brier": g.brier.mean().round(3).values}),
-         "phase3_live_skill_all_verified.csv")
+         f"phase3_live_skill_all_verified_{LABELS}.csv")
     # month by month for the headline target
     d = j[j.target == "h1_1.0mm"].copy()
     d["month"] = pd.to_datetime(d.issue_local).dt.to_period("M").astype(str)
@@ -83,7 +87,7 @@ def live_skill():
                        "model_roc": gm.model_roc.mean().round(3).values,
                        "persistence_roc": gm.persistence_roc.mean().round(3).values,
                        "climatology_roc": gm.climatology_roc.mean().round(3).values}),
-         "phase3_live_skill_h1_1mm_by_month.csv")
+         f"phase3_live_skill_h1_1mm_by_month_{LABELS}.csv")
 
 
 def coverage():
@@ -133,19 +137,18 @@ def github_actions():
 
 
 def ir_health():
-    hl = pd.read_csv(DEPLOY / "v10_health_labeled_live.csv")
+    hl = pd.read_csv(DEPLOY / f"v10_health_labeled_live_{LABELS}.csv")
     hl["month"] = pd.to_datetime(hl.issue_local).dt.to_period("M").astype(str)
     g = hl.groupby("month")
     save(pd.DataFrame({"month": g.size().index, "issue_hours": g.size().values,
                        "wet_cells": g.wet_cells.sum().values,
                        "cold_top_share_of_rain_weighted": g.apply(
                            lambda x: np.average(x.cold235_given_rain, weights=x.wet_cells)).round(3).values}),
-         "phase3_ir_health_live_labeled_by_month.csv")
+         f"phase3_ir_health_live_labeled_by_month_{LABELS}.csv")
 
 
 if __name__ == "__main__":
     OUT.mkdir(exist_ok=True)
-    live_skill()
-    coverage()
-    github_actions()
-    ir_health()
+    sections = sys.argv[1:] or ["live_skill", "coverage", "github_actions", "ir_health"]
+    for name in sections:
+        globals()[name]()

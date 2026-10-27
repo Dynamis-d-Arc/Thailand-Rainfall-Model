@@ -70,6 +70,11 @@ root-level notebooks and scripts and most of them are superseded.
 ## Conventions that bite
 
 - Dashboard code must use `bkk_now()` for time, never the machine clock.
+- Labels since 2026-10-27 are `labels_v2`: window `[t, t+h)` on
+  `precipitation_pixelmax_mm` (wettest pixel's hourly total). Experiment dirs,
+  fold cache and live logs carry a `_labels_v2` suffix; unsuffixed ones are the
+  pre-fix history (window `[t+1, t+1+h)` on `precipitation_max_mm`) and are
+  never rewritten. See `Docs/label_fix_2026-10-27.md`.
 - Prediction stamps are Bangkok local hours (`v10_predictions_YYYYMMDD_HHMM.csv`).
 - Any claim in a report must trace to a stored output, code, or the DB.
 - `*.joblib`, `*.npy`, `*.npz`, `*.log` are gitignored except the `deploy/`

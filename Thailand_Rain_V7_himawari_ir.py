@@ -45,10 +45,12 @@ import numpy as np
 import pandas as pd
 import psycopg2
 
-from Thailand_Rain_V3 import CACHE, DB_CONFIG, IMERG_TABLE_NAME, OUTPUT_DIR as V3_OUTPUT_DIR
+from Thailand_Rain_V3 import (
+    CACHE, DB_CONFIG, IMERG_TABLE_NAME, LABEL_VERSION, OUTPUT_DIR as V3_OUTPUT_DIR)
 from BKK_Rain_V3 import PROJECT_ROOT, TARGET_NAMES, log
 
-OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v7_himawari_ir"
+OUTPUT_DIR = (PROJECT_ROOT / "ML_Model_V2" / "trained_models"
+              / f"om_thailand_rain_v7_himawari_ir_{LABEL_VERSION}")
 HW_DIR = CACHE / "himawari"
 HW_TMP = CACHE / "himawari_tmp"
 

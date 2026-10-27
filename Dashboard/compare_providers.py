@@ -13,16 +13,22 @@ area, the rain probability each forecaster gives for the next 1, 3 and 6 hours:
   tomorrow      Tomorrow.io hourly precipitationProbability            (needs key)
   openweathermap OpenWeatherMap 3-hourly pop                           (needs key)
 
-Provider per-hour probabilities are combined over an h-hour window as
-1 - prod(1 - p_k); the per-hour list is kept in the log for transparency.
+Provider hourly probabilities refer to the PRECEDING hour (Open-Meteo: "probability of
+precipitation ... of the preceding hour"), so the value stamped issue+k covers
+[issue+k-1, issue+k) and hours k=1..h cover the label window [issue, issue+h). The log keeps
+1 - prod(1 - p_k) in p_0.1mm plus the per-hour list; `score` grades the 1 h rows as the
+primary comparison and reports every multi-hour provider row twice, as bounds on P(any rain
+in the window): "[max]" = max_k p_k (lower bound) and "[1-prod]" = 1 - prod(1 - p_k), the
+independence product, an upper bound when hours are positively correlated. Neither is the
+true window probability, which the hourly marginals do not determine.
 Provider probabilities are for "measurable rain at the point", so they are graded
 at the 0.1 mm threshold only; the model is graded at both thresholds.
 
 `score` grades every logged forecast whose IMERG labels have arrived, against two
 label definitions on the same cells: the project's cell-max label (rain anywhere
 in the 25 km cell) and the cell-mean label (area-average, closer to a point
-forecast). It also adds a persistence row (observed IMERG at issue time carried
-forward) and writes a paired comparison - each provider against the model on
+forecast). It also adds a persistence row (observed IMERG in the hour(s) before the
+issue hour carried forward) and writes a paired comparison - each provider against the model on
 exactly the same issue hours and cells - to provider_scores.csv and a Markdown
 summary to provider_comparison.md, ready for the report.
 
@@ -57,9 +63,10 @@ PROJ = ROOT.parent
 PRED_DIR = PROJ / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v10_deploy"
 OUT_DIR = Path(os.getenv("PROVIDER_COMPARE_DIR", str(PRED_DIR)))
 FORECAST_LOG = OUT_DIR / "provider_forecasts.csv"
-SCORES_CSV = OUT_DIR / "provider_scores.csv"
-SUMMARY_MD = OUT_DIR / "provider_comparison.md"
-CLIM_PATH = PRED_DIR / "v10_climatology.csv.gz"
+LABEL_VERSION = "labels_v2"             # window [issue, issue+h) on the wettest pixel's hourly total
+SCORES_CSV = OUT_DIR / f"provider_scores_{LABEL_VERSION}.csv"
+SUMMARY_MD = OUT_DIR / f"provider_comparison_{LABEL_VERSION}.md"
+CLIM_PATH = PRED_DIR / f"v10_climatology_{LABEL_VERSION}.csv.gz"
 KEYS_FILE = ROOT / "provider_keys.json"
 ACCU_CACHE = ROOT / "data" / "accuweather_locations.json"
 
@@ -73,6 +80,7 @@ HTTP_TIMEOUT = 25
 UA = "thailand-rainwatch-capstone (brandon.ng.kh@gmail.com)"
 
 IMERG_TABLE = '"IMERG_THAILAND_DATA"'
+IMERG_LABEL_COLUMN = "precipitation_pixelmax_mm"
 DB_CONFIG = {
     "host": os.getenv("PGHOST", "localhost"),
     "port": int(os.getenv("PGPORT", "5432")),
@@ -384,12 +392,27 @@ def metrics(y, p, flag_thr=0.5):
             "csi": round(tp / (tp + fp + fn), 3) if tp + fp + fn else np.nan}
 
 
+def label_hours(issue, h):
+    """IMERG rows (start-stamped) covering the window [issue, issue+h)."""
+    return [issue + timedelta(hours=k) for k in range(h)]
+
+
+def persistence_hours(issue, h):
+    """The h observed hours before the issue hour, oldest first: [issue-h, issue)."""
+    return [issue - timedelta(hours=k) for k in range(h, 0, -1)]
+
+
+def window_bounds(pops):
+    """(lower, upper) bounds on P(any rain in the window) from the hourly marginals p_k."""
+    return max(float(p) for p in pops), combine(pops)
+
+
 def load_imerg(lo, hi):
     import psycopg2
     conn = psycopg2.connect(**DB_CONFIG)
     try:
         cur = conn.cursor()
-        cur.execute(f"SELECT grid_number, local_observation_time, precipitation_max_mm, precipitation_mm "
+        cur.execute(f"SELECT grid_number, local_observation_time, {IMERG_LABEL_COLUMN}, precipitation_mm "
                     f"FROM {IMERG_TABLE} WHERE is_complete_hour AND grid_number = ANY(%s) "
                     f"AND local_observation_time BETWEEN %s AND %s", (BKK_GRIDS, lo, hi))
         df = pd.DataFrame(cur.fetchall(), columns=["grid_number", "t", "pmax", "pmean"])
@@ -417,7 +440,7 @@ def cmd_score(args):
 
     def label(kind, grid, issue, h, thr):
         src = pmax if kind == "cellmax" else pmean
-        hours = [issue + timedelta(hours=k) for k in range(1, h + 1)]
+        hours = label_hours(issue, h)
         if grid not in src.index or any(t not in src.columns for t in hours):
             return None
         vals = src.loc[grid, hours].to_numpy(dtype=float)
@@ -426,7 +449,7 @@ def cmd_score(args):
         return int((vals >= thr).any())
 
     def persistence(grid, issue, h, thr):
-        hours = [issue - timedelta(hours=k) for k in range(h - 1, -1, -1)]
+        hours = persistence_hours(issue, h)
         if grid not in pmax.index or any(t not in pmax.columns for t in hours):
             return None
         vals = pmax.loc[grid, hours].to_numpy(dtype=float)
@@ -439,6 +462,8 @@ def cmd_score(args):
     pcol = {thr: list(fc.columns).index(f"p_{thr}mm") for thr in THRESHOLDS}
     for r in fc.itertuples(index=False):
         issue = r.issue_local.to_pydatetime()
+        pops = (json.loads(r.hourly_pop)
+                if isinstance(r.hourly_pop, str) and r.hourly_pop.startswith("[") else None)
         for kind in ("cellmax", "cellmean"):
             for thr in THRESHOLDS:
                 p = r[pcol[thr]]      # positional: pandas mangles dotted column names
@@ -447,9 +472,16 @@ def cmd_score(args):
                 y = label(kind, int(r.grid_number), issue, int(r.horizon_h), thr)
                 if y is None:
                     continue
-                recs.append({"stamp": r.stamp, "issue_local": issue, "grid_number": int(r.grid_number),
-                             "horizon_h": int(r.horizon_h), "provider": r.provider,
-                             "label": kind, "threshold_mm": thr, "p": float(p), "y": y})
+                # multi-hour provider rows are bounds, not probabilities (module docstring)
+                variants = [(r.provider, float(p))]
+                if pops and int(r.horizon_h) > 1:
+                    lower, upper = window_bounds(pops)
+                    variants = [(f"{r.provider}[max]", lower), (f"{r.provider}[1-prod]", upper)]
+                for prov, pv in variants:
+                    recs.append({"stamp": r.stamp, "issue_local": issue,
+                                 "grid_number": int(r.grid_number), "horizon_h": int(r.horizon_h),
+                                 "provider": prov, "label": kind, "threshold_mm": thr,
+                                 "p": pv, "y": y})
         # persistence, once per (issue, grid, h)
         if r.provider == "model":
             for kind in ("cellmax", "cellmean"):
@@ -490,12 +522,17 @@ def cmd_score(args):
 
 
 def write_summary(S):
-    lines = ["# Bangkok: live model vs public weather services", "",
+    lines = ["# Bangkok: live model vs public weather services (labels_v2)", "",
              f"Generated {datetime.now():%Y-%m-%d %H:%M}. Nine 25 km cells over the Bangkok metro area, "
              "graded against IMERG. Each provider row is paired with the model on exactly the same "
              "issue hours and cells; 'model' columns are the model on that provider's sample. "
              "Flags use p >= 0.5 for every forecaster. Providers are graded at 0.1 mm only "
-             "(their probability means 'measurable rain at the point').", ""]
+             "(their probability means 'measurable rain at the point'). Labels: wettest IMERG "
+             "pixel's hourly total over the window [issue, issue+h); provider hour k refers to the "
+             "preceding hour, so hours 1..h cover that same window. The 1 h rows are the primary "
+             "comparison. Multi-hour provider rows are BOUNDS on P(any rain in the window), not "
+             "probabilities: [max] = max of the hourly values (lower bound), [1-prod] = the "
+             "independence product (upper bound under positive hour-to-hour correlation).", ""]
     for kind, title in (("cellmax", "Label: rain anywhere in the cell (project label, IMERG cell-max)"),
                         ("cellmean", "Label: area-average rain (IMERG cell-mean, closer to a point forecast)")):
         lines += [f"## {title}", ""]
@@ -525,7 +562,7 @@ def cmd_report(args):
 
 # ----------------------------------------------------------------------------- excel export
 
-XLSX_PATH = OUT_DIR / "provider_comparison.xlsx"
+XLSX_PATH = OUT_DIR / f"provider_comparison_{LABEL_VERSION}.xlsx"
 PROVIDER_ORDER = ["model", "open_meteo", "google", "accuweather", "weatherapi", "tomorrow",
                   "openweathermap", "climatology", "persistence"]
 
