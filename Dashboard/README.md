@@ -96,7 +96,10 @@ which the dashboard now reads. The two sets must not be compared with each
 other. See `Docs/label_fix_2026-10-27.md`.
 
 Per run it tops up `"IMERG_THAILAND_DATA"` via the Earth Engine fetcher
-(idempotent), then appends per-(issue, target) scores — Brier, ROC-AUC, and the
+(idempotent), then fills any hour Earth Engine has not delivered yet straight
+from NASA's archive (`IMERG_Script/fetch_imerg_thailand_data_nasa.py`, OPeNDAP
+subsets of the GES DISC Late Run files, same footprint and columns; needs the
+Earthdata login in `~/_netrc`, and is skipped with a log line without it), then appends per-(issue, target) scores — Brier, ROC-AUC, and the
 alert confusion (POD/FAR/CSI) — to `v10_verification_log_labels_v2.csv`, and extends the
 labeled V9 health metric from the per-cell `hw_cold235_env_lag1` column the
 predict phase now writes into each prediction CSV

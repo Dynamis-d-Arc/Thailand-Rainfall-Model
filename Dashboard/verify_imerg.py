@@ -51,6 +51,9 @@ ROOT = Path(__file__).resolve().parent
 PROJ = ROOT.parent
 PRED_DIR = PROJ / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v10_deploy"
 FETCH_SCRIPT = PROJ / "IMERG_Script" / "fetch_imerg_thailand_data_gee.py"
+# Fallback when Earth Engine's IMERG copy lags NASA's archive: fills only the hours the table
+# is still missing, straight from GES DISC (needs the Earthdata login in ~/_netrc).
+NASA_FETCH_SCRIPT = PROJ / "IMERG_Script" / "fetch_imerg_thailand_data_nasa.py"
 # Label set version (2026-10-27): window [issue, issue+h) on precipitation_pixelmax_mm, the
 # wettest pixel's hourly total. The logs without a suffix hold the earlier scoring, which used
 # [issue+1, issue+1+h) on precipitation_max_mm (an upper bound on the pixel total); they are
@@ -178,20 +181,24 @@ def metrics(y, p, flag):
 
 
 def run_fetch(start_date, end_date):
-    """Top up IMERG for [start_date, end_date] (UTC dates); complete chunks are skipped."""
-    cmd = [sys.executable, str(FETCH_SCRIPT),
-           "--start-date", start_date.strftime("%Y-%m-%d"),
-           "--end-date", end_date.strftime("%Y-%m-%d")]
-    log("fetching IMERG " + " ".join(cmd[2:]))
-    # creationflags: harmless here (sys.executable is pythonw under the scheduled
-    # task) but keeps the no-console rule uniform across the project's spawns.
-    r = subprocess.run(cmd, cwd=str(PROJ), capture_output=True, text=True, timeout=30 * 60,
-                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    tail = (r.stdout + r.stderr).strip().splitlines()
-    for line in tail[-4:]:
-        log(f"  fetch| {line}")
-    if r.returncode != 0:
-        raise RuntimeError(f"IMERG fetch exited {r.returncode}")
+    """Top up IMERG for [start_date, end_date] (UTC dates): Earth Engine first (complete chunks
+    are skipped), then NASA's archive for any hour Earth Engine has not delivered yet."""
+    dates = ["--start-date", start_date.strftime("%Y-%m-%d"),
+             "--end-date", end_date.strftime("%Y-%m-%d")]
+    for script, fatal in ((FETCH_SCRIPT, True), (NASA_FETCH_SCRIPT, False)):
+        log(f"fetching IMERG via {script.stem} " + " ".join(dates))
+        # creationflags: harmless here (sys.executable is pythonw under the scheduled
+        # task) but keeps the no-console rule uniform across the project's spawns.
+        r = subprocess.run([sys.executable, str(script)] + dates, cwd=str(PROJ),
+                           capture_output=True, text=True, timeout=30 * 60,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        tail = (r.stdout + r.stderr).strip().splitlines()
+        for line in tail[-4:]:
+            log(f"  fetch| {line}")
+        if r.returncode != 0:
+            if fatal:
+                raise RuntimeError(f"IMERG fetch exited {r.returncode}")
+            log(f"  {script.stem} exited {r.returncode}; scoring with what Earth Engine delivered")
 
 
 def lead_hours(issue):

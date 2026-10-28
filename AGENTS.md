@@ -52,7 +52,8 @@ root-level notebooks and scripts and most of them are superseded.
   to localhost / db `postgres` (see `DB_CONFIG` in any `OM_Script/*.py`).
 - Fetch + precompute: `OM_Script/` (Open-Meteo, always pass `models=`
   explicitly), `IMERG_Script/` (NASA IMERG via Google Earth Engine, see its
-  README), `DB_Script/` (grids, boundaries, lag features, TMD gauges).
+  README; `fetch_imerg_thailand_data_nasa.py` fills hours Earth Engine lags on,
+  straight from GES DISC), `DB_Script/` (grids, boundaries, lag features, TMD gauges).
 - Main tables: `"OM_Thailand_Data"`, `"OM_Thailand_Forecast_Data"`,
   `"IMERG_THAILAND_DATA"`, `thailand_grid_25km`, and the Bangkok-era
   `"OM_BKK_DATA"`, `"OM_BKK_DATA_PRECOMPUTE"`, `"IMERG_BKK_DATA"`,

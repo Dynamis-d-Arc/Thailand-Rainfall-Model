@@ -35,3 +35,6 @@ Dashboard/provider_keys.json
 !ML_Model_V2/trained_models/om_thailand_rain_v10_deploy/deploy/himawari/pixel_masks.npz
 # scratch space satpy unpacks Himawari segments into at runtime
 ML_Model_V2/trained_models/om_thailand_rain_v10_deploy/deploy/himawari_tmp/
+
+# libdap client config written by the OPeNDAP client (IMERG direct-NASA fallback)
+.dodsrc
