@@ -12,7 +12,7 @@ Dashboard/data/
 
 # Regenerable CV fold caches (multi-GB)
 ML_Model_V2/_th_cache*/
-ML_Model_V2/_v3_cache/
+ML_Model_V2/_v3_cache*/
 ML_Model_V2/cache/
 
 # Trained model binaries and array dumps (rebuildable from scripts)
