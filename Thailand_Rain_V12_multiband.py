@@ -35,14 +35,14 @@ import numpy as np
 import pandas as pd
 
 from BKK_Rain_V3 import TARGET_NAMES, log
-from Thailand_Rain_V3 import CACHE
+from Thailand_Rain_V3 import CACHE, LABEL_VERSION
 from Thailand_Rain_V7_himawari_ir import (
     GRID_CSV, HW_DIR, HW_TMP, UTC_OFFSET_HOURS,
     s3_client, slot_candidates,
 )
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "ML_Model_V2" / "trained_models" / \
-    "om_thailand_rain_v12_multiband"
+    f"om_thailand_rain_v12_multiband_{LABEL_VERSION}"
 CROP_LL_BBOX = (97.0, 5.3, 106.0, 20.9)
 MB_STAT_NAMES = ["tb_mean", "tb_min", "tb_mean_env", "tb_min_env"]
 BANDS = ["B07", "B11", "B15"]

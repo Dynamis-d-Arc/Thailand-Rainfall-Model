@@ -1,0 +1,13 @@
+{
+  "rows": 599760,
+  "day0_wet_rate": 0.3810224089635854,
+  "alt_wet_rate": 0.4221138455382153,
+  "precip_r_day0_vs_alt": 0.21906611832627407,
+  "wet_hour_jaccard": 0.49106639839034205,
+  "imerg_rows": 598927,
+  "imerg_wet_rate": 0.368555767230397,
+  "precip_r_day0_vs_imerg": 0.2557775894794858,
+  "precip_r_alt_vs_imerg": 0.15319623814863306,
+  "wet_jaccard_day0_imerg": 0.39413564428706765,
+  "wet_jaccard_alt_imerg": 0.36887630571332725
+}

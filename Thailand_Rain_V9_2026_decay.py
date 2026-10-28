@@ -47,10 +47,11 @@ import pandas as pd
 import psycopg2
 
 from BKK_Rain_V3 import PROJECT_ROOT, TARGET_NAMES, log
-from Thailand_Rain_V3 import CACHE, DB_CONFIG, IMERG_TABLE_NAME, block_keys
+from Thailand_Rain_V3 import CACHE, DB_CONFIG, IMERG_TABLE_NAME, LABEL_VERSION, block_keys
 from Thailand_Rain_V7_himawari_ir import himawari_feature_names
 
-OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v9_2026_decay"
+OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / f"om_thailand_rain_v9_2026_decay_{LABEL_VERSION}"
+HW_CONFIG = "hw_allseason"  # labels_v2: V7 was not refitted; V13 is the same IR feature set fitted on all 13 blocks
 TARGET = "h1_1.0mm"          # the headline target; 0.1mm variant reported alongside
 COVERED_FOLDS = [0, 1, 5, 6, 7, 11, 12]
 
@@ -72,7 +73,7 @@ def phase_diagnose():
     tf = np.load(CACHE / "forecast_time.npy")
     unit = np.load(CACHE / "unit_id.npy")
     hw_block = np.load(CACHE / "hw_block_offset0.npy")
-    oof_hw = np.load(CACHE / "oof_cal_hw_offset0h.npy")
+    oof_hw = np.load(CACHE / f"oof_cal_{HW_CONFIG}.npy")
     oof_om = np.load(CACHE / "oof_cal_om_only.npy")
     fold_key = block_keys(tf)
     hw_names = himawari_feature_names()
@@ -100,7 +101,7 @@ def phase_diagnose():
                 "month": int(mo), "target": tname, "rows": int(m.sum()),
                 "base_rate": float(y[m, i].mean()),
                 "om_only": float(roc_auc_score(y[m, i], oof_om[m, i])),
-                "hw_offset0h": float(roc_auc_score(y[m, i], oof_hw[m, i])),
+                HW_CONFIG: float(roc_auc_score(y[m, i], oof_hw[m, i])),
                 "raw_ir_roc": float(roc_auc_score(y[mv, i], -env1[mv]))
                               if mv.sum() > 1000 and len(np.unique(y[mv, i])) == 2 else np.nan,
                 "hw_valid_share": float(valid[base_m].mean()),
@@ -112,11 +113,11 @@ def phase_diagnose():
                 "cold235_wet_mean": float(np.nanmean(cold1[base_m & valid])),
             })
     monthly = pd.DataFrame(rows)
-    monthly["roc_gain"] = monthly["hw_offset0h"] - monthly["om_only"]
+    monthly["roc_gain"] = monthly[HW_CONFIG] - monthly["om_only"]
     monthly.to_csv(OUTPUT_DIR / "v9_monthly_trajectory.csv", index=False)
     hm = monthly[monthly.target == TARGET]
     log(f"=== monthly trajectory ({TARGET}) ===")
-    print(hm[["month", "rows", "base_rate", "om_only", "hw_offset0h", "roc_gain",
+    print(hm[["month", "rows", "base_rate", "om_only", HW_CONFIG, "roc_gain",
               "raw_ir_roc", "hw_valid_share", "tb_min_env_p10", "tb_min_env_median",
               "cold235_wet_mean"]].round(4).to_string(index=False))
 
@@ -128,9 +129,9 @@ def phase_diagnose():
                    run_type,
                    MIN(product_version) AS min_version, MAX(product_version) AS max_version,
                    COUNT(*) AS rows,
-                   AVG((precipitation_max_mm >= 1.0)::int) AS wet1_rate,
-                   AVG((precipitation_max_mm >= 0.1)::int) AS wet01_rate,
-                   AVG(precipitation_max_mm) FILTER (WHERE precipitation_max_mm >= 1.0)
+                   AVG((precipitation_pixelmax_mm >= 1.0)::int) AS wet1_rate,
+                   AVG((precipitation_pixelmax_mm >= 0.1)::int) AS wet01_rate,
+                   AVG(precipitation_pixelmax_mm) FILTER (WHERE precipitation_pixelmax_mm >= 1.0)
                        AS wet_intensity,
                    AVG(pixel_count) AS pixel_count_mean
             FROM {IMERG_TABLE_NAME}
@@ -171,11 +172,11 @@ def phase_diagnose():
                 "era": era, "band": b, "rows": int(m.sum()),
                 "base_rate": float(y[m, i].mean()),
                 "om_only": float(roc(y[m, i], oof_om[m, i])),
-                "hw_offset0h": float(roc(y[m, i], oof_hw[m, i])),
+                HW_CONFIG: float(roc(y[m, i], oof_hw[m, i])),
                 "raw_ir_roc": float(roc(y[mv, i], -env1[mv])) if mv.sum() > 1000 else np.nan,
             })
     regional = pd.DataFrame(reg_rows)
-    regional["roc_gain"] = regional["hw_offset0h"] - regional["om_only"]
+    regional["roc_gain"] = regional[HW_CONFIG] - regional["om_only"]
     regional.to_csv(OUTPUT_DIR / "v9_regional_gain.csv", index=False)
     log(f"=== gain by region x era ({TARGET}) ===")
     print(regional.round(4).to_string(index=False))

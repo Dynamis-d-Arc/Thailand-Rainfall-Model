@@ -43,7 +43,7 @@ root-level notebooks and scripts and most of them are superseded.
   `V10` (deploy), `V12` (multiband pilot, not deployed), `V13` (dry season).
 - Each experiment writes to `ML_Model_V2/trained_models/<experiment_name>/`.
   Search there for stored metrics, fold tables and manifests.
-- `ML_Model_V2/_th_cache/`, `_v3_cache/`, `cache/` are regenerable fold
+- `ML_Model_V2/_th_cache_labels_v2/`, `_v3_cache_labels_v2/`, `cache/` are regenerable fold
   caches, gitignored and multi-GB. Do not read them to answer questions.
 
 ## Data pipeline (Postgres, local)

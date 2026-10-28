@@ -62,15 +62,15 @@ import numpy as np
 import pandas as pd
 
 from BKK_Rain_V3 import (
-    CACHE, FEATURE_COLUMNS, MIN_FOLD_ROWS, MODEL_PLAN, PROJECT_ROOT, PURGE_HOURS,
+    CACHE, FEATURE_COLUMNS, LABEL_VERSION, MIN_FOLD_ROWS, MODEL_PLAN, PROJECT_ROOT, PURGE_HOURS,
     RANDOM_STATE, TARGETS, TARGET_NAMES,
     fit_predict_calibrated, log, purged_train_mask, score_probabilities,
 )
 from BKK_Rain_V5_gauge_nowcast import gauge_feature_names
 
-V3_OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / "om_bkk_rain_v3_imerg_history"
-V5_OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / "om_bkk_rain_v5_gauge_nowcast"
-OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / "om_bkk_rain_v6_gsmap"
+V3_OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / f"om_bkk_rain_v3_imerg_history_{LABEL_VERSION}"
+V5_OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / f"om_bkk_rain_v5_gauge_nowcast_{LABEL_VERSION}"
+OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / f"om_bkk_rain_v6_gsmap_{LABEL_VERSION}"
 GS_DIR = CACHE / "gsmap"                 # per-day Bangkok windows + fetch config
 
 FTP_HOST = os.getenv("GSMAP_FTP_HOST", "hokusai.eorc.jaxa.jp")

@@ -26,14 +26,14 @@ import numpy as np
 import pandas as pd
 
 from BKK_Rain_V3 import (
-    CACHE, FEATURE_COLUMNS, MAX_HISTORY_LAG, MIN_FOLD_ROWS, MODEL_PLAN, PROJECT_ROOT,
+    CACHE, FEATURE_COLUMNS, LABEL_VERSION, MAX_HISTORY_LAG, MIN_FOLD_ROWS, MODEL_PLAN, PROJECT_ROOT,
     PURGE_HOURS, RANDOM_STATE, TARGETS, TARGET_NAMES,
     build_history_block, build_history_query, connect, fit_predict_calibrated,
     history_feature_names, log, purged_train_mask, score_probabilities,
 )
 
-V3_OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / "om_bkk_rain_v3_imerg_history"
-OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / "om_bkk_rain_v4_latency_sweep"
+V3_OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / f"om_bkk_rain_v3_imerg_history_{LABEL_VERSION}"
+OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / f"om_bkk_rain_v4_latency_sweep_{LABEL_VERSION}"
 
 SWEEP_OFFSETS = [1, 2, 3, 4, 5]  # 0 and 6 come from V3 (imerg_research / imerg_deploy)
 

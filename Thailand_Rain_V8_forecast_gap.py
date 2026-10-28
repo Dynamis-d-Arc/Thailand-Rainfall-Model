@@ -53,7 +53,7 @@ from BKK_Rain_V3 import (
     FEATURE_COLUMNS, MODEL_PLAN, PROJECT_ROOT, PURGE_HOURS, RANDOM_STATE,
     TARGETS, TARGET_NAMES, fit_predict_calibrated, log, purged_train_mask,
 )
-from Thailand_Rain_V3 import CACHE, DB_CONFIG, IMERG_TABLE_NAME
+from Thailand_Rain_V3 import CACHE, DB_CONFIG, IMERG_TABLE_NAME, LABEL_VERSION
 from Thailand_Rain_V7_himawari_ir import himawari_feature_names
 
 DAY0_TABLE = '"OM_THAILAND_DATA_PRECOMPUTE"'
@@ -63,7 +63,7 @@ ALT_TABLES = {
 }
 VARIANT = sys.argv[2] if len(sys.argv) > 2 else "prevrun"
 ALT_TABLE = ALT_TABLES[VARIANT]
-OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v8_forecast_gap"
+OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / f"om_thailand_rain_v8_forecast_gap_{LABEL_VERSION}"
 
 TEST_START = "2026-06-01 00:00:00"
 TEST_END = "2026-06-30 23:00:00"   # inclusive, local
@@ -93,7 +93,7 @@ def phase_compare():
     query = f"""
     SELECT e.grid_number, e.local_forecast_time,
         {col_sql},
-        im.precipitation_max_mm AS imerg_cell_max
+        im.precipitation_pixelmax_mm AS imerg_cell_max
     FROM {DAY0_TABLE} e
     JOIN {ALT_TABLE} f
       ON f.grid_number = e.grid_number

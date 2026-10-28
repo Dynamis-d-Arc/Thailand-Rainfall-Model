@@ -61,8 +61,9 @@ IMERG_TABLE_NAME = '"IMERG_BKK_DATA"'
 PROJECT_ROOT = Path(__file__).resolve().parent
 V1_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / "om_bkk_rain_any_v1"
 V2_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / "om_bkk_rain_v2_imerg"
-OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / "om_bkk_rain_v3_imerg_history"
-CACHE = Path(os.getenv("V3_CACHE", str(PROJECT_ROOT / "ML_Model_V2" / "_v3_cache")))
+LABEL_VERSION = "labels_v2"  # suffix for every output dir and cache fitted on the [t, t+h) window
+OUTPUT_DIR = PROJECT_ROOT / "ML_Model_V2" / "trained_models" / f"om_bkk_rain_v3_imerg_history_{LABEL_VERSION}"
+CACHE = Path(os.getenv("V3_CACHE", str(PROJECT_ROOT / "ML_Model_V2" / f"_v3_cache_{LABEL_VERSION}")))
 CACHE.mkdir(parents=True, exist_ok=True)
 
 HORIZONS = [1, 3, 6]

@@ -41,7 +41,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent           # Dashboard/
 PROJ = ROOT.parent
 PRED_DIR = PROJ / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v10_deploy"
-V9_DIR = PROJ / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v9_2026_decay"
+V9_DIR = PROJ / "ML_Model_V2" / "trained_models" / "om_thailand_rain_v9_2026_decay_labels_v2"  # 28 Oct 2026 rerun on the corrected labels
 DATA = ROOT / "data"
 RUN_MINUTE = 10        # earliest minute past the hour to launch a predict run
 MAX_LAUNCHES_PER_HOUR = 2   # the :10 run plus one retry after the cool-down; the cloud run covers the rest
