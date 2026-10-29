@@ -104,11 +104,27 @@ target). Persistence here is observed IMERG of the previous hour carried forward
 
 ## 5. Proposed test (Phase 4 proper, after enough archive)
 
-1. **Radar-vs-IMERG agreement (no model).** For each archived hour, make per-cell radar
-   1-h accumulation and echo-presence fields. Score them against the `labels_v2` labels as a
-   third live baseline next to climatology and persistence.
+1. **Radar-vs-IMERG agreement (no model).** This step is built: `score_radar_persistence.py`.
+   For each archived hour it makes per-cell radar 1-h accumulation (cell max and cell mean),
+   then scores two things against the `labels_v2` labels:
+   - radar against IMERG for the same hour;
+   - radar persistence next to the live model and IMERG persistence, on the same issue hours
+     and cells.
+
+   It prints radar minus model per target, with a 95% CI over day means.
    - Go: radar persistence clearly beats the model at h1 on the same hours and cells.
    - No-go: if it doesn't, a radar feature is unlikely to add much on IMERG-graded targets.
+
+   *Checked before any radar label existed* (an oracle test). IMERG was fed in as "radar" for
+   26–28 Oct, and it behaved as it must:
+   - radar persistence scored exactly like IMERG persistence, and same-hour agreement was ROC 1.0;
+   - the model and IMERG-persistence rows matched `v10_verification_log_labels_v2.csv` and
+     `v10_baseline_log_labels_v2.csv` (310 rows, max ROC difference 0).
+
+   The test also showed that the live baseline log ranks persistence on a score capped at the
+   threshold, which ties every wet cell. Its persistence ROC therefore reads 0.005–0.025 low on
+   average (up to 0.08) against the raw-score ROC used here, so the true h1 gap is a little
+   bigger than section 4's table. The production verify was left unchanged.
 2. **Feature experiment, only if step 1 is a go.** Take the V13 config and add radar features:
    - per cell and its env ring: last-frame max and mean rate;
    - wet share above 1 mm/h, and echo share;

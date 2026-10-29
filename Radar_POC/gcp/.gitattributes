@@ -1,0 +1,2 @@
+# this repo checks out with CRLF; bash on the VM cannot run a CRLF script
+*.sh text eol=lf

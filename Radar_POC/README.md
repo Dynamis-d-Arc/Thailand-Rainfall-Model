@@ -122,6 +122,8 @@ Storage is about 32 MB/day at full capture, or roughly 1 GB a month.
 ```powershell
 # status and missing-scan summary (rewrites slot_inventory.csv and collection_report.md)
 & "C:\Users\Brandon\Documents\Phase 1\.venv\Scripts\python.exe" Radar_POC\tmd_radar_collect.py report
+# radar persistence vs IMERG labels vs the live model (needs Postgres; labels lag ~1.5 days)
+& "C:\Users\Brandon\Documents\Phase 1\.venv\Scripts\python.exe" Radar_POC\score_radar_persistence.py
 # pause / resume / remove the task
 Disable-ScheduledTask -TaskName 'TMD Radar Collector'
 Enable-ScheduledTask  -TaskName 'TMD Radar Collector'
@@ -138,7 +140,8 @@ script, so **don't remove the worktree while the task is registered**.
   longer is gone. The hourly predict history shows the laptop is awake only ~8–14 h/day
   (`rainwatch-sleep-gaps`). The fixes would be a wake timer, keeping the PC awake, or running the
   collector off the laptop. A GitHub Actions copy would need a workflow on `main` and would
-  commit ~200 files a day, so it was left out of this POC.
+  commit ~200 files a day, so it was left out of this POC. The off-laptop option is set out in
+  [`gcp/GCP_SETUP.md`](gcp/GCP_SETUP.md): a Google Cloud e2-micro at about $3.65 a month.
 - No coverage mask: you can't tell "no echo" from "no radar" in one frame. The union over many
   frames, or the radar sites and their ranges, has to stand in for one.
 - Rates come from one fixed Z–R. Clutter, anomalous propagation, the cone of silence near each
