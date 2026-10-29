@@ -49,17 +49,22 @@ step 1.
 ```bash
 gcloud config set project YOUR_PROJECT_ID
 gcloud services enable compute.googleapis.com
-gcloud compute instances create tmd-radar \
-  --zone=us-west1-b --machine-type=e2-micro \
-  --image-family=debian-12 --image-project=debian-cloud \
-  --boot-disk-size=30GB --boot-disk-type=pd-standard \
-  --metadata=ssh-keys="brandon:PASTE_PUBLIC_KEY_HERE"
-gcloud compute instances describe tmd-radar --zone=us-west1-b \
-  --format="get(networkInterfaces[0].accessConfigs[0].natIP)"
+for z in us-west1-a us-west1-b us-west1-c us-central1-a us-central1-b us-central1-c us-central1-f us-east1-b us-east1-c us-east1-d; do
+  gcloud compute instances create tmd-radar --zone=$z --machine-type=e2-micro \
+    --image-family=debian-12 --image-project=debian-cloud \
+    --boot-disk-size=30GB --boot-disk-type=pd-standard \
+    --metadata=ssh-keys="brandon:PASTE_PUBLIC_KEY_HERE" && echo "CREATED IN $z" && break
+done
+gcloud compute instances list --format="table(name,zone.basename(),networkInterfaces[0].accessConfigs[0].natIP,status)"
 ```
 
-The last command prints the VM's IP address. New projects have a default firewall rule that
-allows SSH, so nothing else is needed.
+The loop tries each free-tier zone in turn. Zones run out of e2-micro capacity
+(`ZONE_RESOURCE_POOL_EXHAUSTED`), as `us-west1-b` did on 29 Oct, so a few such errors before
+one zone succeeds are normal. The last command prints the VM's zone and IP address. New projects
+have a default firewall rule that allows SSH, so nothing else is needed.
+
+**The VM made on 2026-10-29:** `tmd-radar` in project `tmd-radar-poc`, zone `us-west1-a`, IP
+`136.117.100.120`. Collecting since 10:00 UTC that day, with the cron line from `setup_vm.sh`.
 
 ## 4. Install the collector (PowerShell, from the worktree root)
 
@@ -104,9 +109,12 @@ coverage, gaps and lag.
   ssh -i "$HOME\.ssh\tmd_radar_vm" "brandon@$ip" "bash ~/setup_vm.sh"
   ```
 - **IP changed:** the address is ephemeral, so it changes if the VM is stopped and started
-  (not on a reboot). Re-run the `describe` command from step 3.
-- **Pause:** `gcloud compute instances stop tmd-radar --zone=us-west1-b` in Cloud Shell. A
+  (not on a reboot). Re-run the `instances list` command from step 3.
+- **Don't filter setup's output through a pipe over ssh.** On 29 Oct a mangled `| grep` cut
+  `setup_vm.sh` off right after its apt step (SIGPIPE). Re-running it was safe, but write to a
+  log instead: `bash ~/setup_vm.sh > ~/setup.log 2>&1`.
+- **Pause:** `gcloud compute instances stop tmd-radar --zone=us-west1-a` in Cloud Shell. A
   stopped VM releases the address, so it costs nothing, and the disk stays free.
 - **Finished:** sync one last time, then run
-  `gcloud compute instances delete tmd-radar --zone=us-west1-b`. Deleting the VM deletes its
+  `gcloud compute instances delete tmd-radar --zone=us-west1-a`. Deleting the VM deletes its
   disk, archive included.
