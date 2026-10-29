@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,6 +45,25 @@ def test_verify_window_and_persistence_hours():
     assert hist[-1:] == [ISSUE - timedelta(hours=1)]
     assert hist[-3:] == [ISSUE - timedelta(hours=k) for k in (3, 2, 1)]
     assert not set(leads) & set(hist)
+
+
+def test_persistence_raw_changes_only_the_roc(tmp_path):
+    from sklearn.metrics import roc_auc_score
+    rng = np.random.default_rng(0)
+    cells = np.arange(1, verify.N_CELLS + 1)
+    hours = verify.hist_hours(ISSUE)[-1:] + verify.lead_hours(ISSUE)[:1]
+    pmax = pd.DataFrame(rng.gamma(0.5, 2.0, (len(cells), 2)), index=cells, columns=hours)
+    pred = pd.DataFrame({"grid_number": cells, "p_h1_1.0mm": 0.5, "flag_h1_1.0mm": 1})
+    path = tmp_path / "pred.csv"
+    pred.to_csv(path, index=False)
+    _, base, _ = verify.score_issue("x", ISSUE, path, pmax, None, {("x", "h1_1.0mm")}, set(), None, {})
+    rows = {r["baseline"]: r for r in base}
+    old, raw = rows["persistence"], rows["persistence_raw"]
+    assert {k: v for k, v in old.items() if k not in ("baseline", "roc_auc")} == \
+           {k: v for k, v in raw.items() if k not in ("baseline", "roc_auc")}
+    y = (pmax[hours[1]] >= 1.0).astype(int)
+    assert raw["roc_auc"] == round(roc_auc_score(y, pmax[hours[0]]), 4)   # ranks the raw score
+    assert raw["roc_auc"] != old["roc_auc"]                               # the clip ties wet cells
 
 
 def test_climatology_window_and_missing_hours():

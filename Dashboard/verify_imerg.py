@@ -77,10 +77,15 @@ MAX_LEAD = 6
 #                  "score >= rain threshold", i.e. "it just rained, so it will rain". Uses
 #                  observed IMERG up to issue time, which the live model never has (4h+
 #                  latency) - this is a skill reference, not a deployable forecast.
+#   persistence_raw - the same forecast, flags and Brier; only its ROC differs. `persistence`
+#                  ranks the score after clipping at the threshold, which ties every wet
+#                  cell, so its ROC reads low (2026-10-29: 0.005-0.025 on average). This row
+#                  ranks the raw score. `persistence` is still logged unchanged so earlier
+#                  numbers reproduce.
 #   climatology  - per-cell, per-month, per-hour-of-day observed label frequency from
 #                  2024-07..2026-07 (build_climatology.py); flagged with the same
 #                  probability threshold as the deployed model for that target.
-BASELINES = ("persistence", "climatology")
+BASELINES = ("persistence", "persistence_raw", "climatology")
 
 DB_CONFIG = {
     "host": os.getenv("PGHOST", "localhost"),
@@ -290,17 +295,22 @@ def score_issue(stamp, issue, csv_path, pmax, rt, done, done_base, clim, thr_map
                         "cold235_given_rain": round(float((cold[wet] > 0).mean()), 4),
                     }
 
-        if need_base["persistence"]:
+        if need_base["persistence"] or need_base["persistence_raw"]:
             # the last `horizon` observed hours ending at issue time, same cells as ok
             recent = hist[hist_hrs[-horizon:]]
             ok_p = ok & recent.notna().all(axis=1)
             if int(ok_p.sum()) >= MIN_COVERAGE * N_CELLS:
                 y_p = (window[ok_p] >= thr).any(axis=1).astype(int).to_numpy()
                 score = recent[ok_p].max(axis=1).to_numpy()
-                # Brier needs a probability: rank the score into [0,1] by thr saturation
-                p_p = np.clip(score / thr, 0, 1)
-                base_rows.append({**common, "baseline": "persistence",
-                                  **metrics(y_p, p_p, score >= thr), "scored_at": now_str})
+                if need_base["persistence"]:
+                    # Brier needs a probability: rank the score into [0,1] by thr saturation
+                    p_p = np.clip(score / thr, 0, 1)
+                    base_rows.append({**common, "baseline": "persistence",
+                                      **metrics(y_p, p_p, score >= thr), "scored_at": now_str})
+                if need_base["persistence_raw"]:
+                    # metrics() clips for Brier itself, so only the ROC ranking changes
+                    base_rows.append({**common, "baseline": "persistence_raw",
+                                      **metrics(y_p, score / thr, score >= thr), "scored_at": now_str})
 
         if need_base["climatology"]:
             try:

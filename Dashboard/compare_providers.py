@@ -455,7 +455,7 @@ def cmd_score(args):
         vals = pmax.loc[grid, hours].to_numpy(dtype=float)
         if np.isnan(vals).any():
             return None
-        return float(np.clip(vals.max() / thr, 0, 1))
+        return float(vals.max() / thr)       # unclipped; the caller clips for "persistence"
 
     # long table: one row per (issue, grid, h, provider) with labels attached
     recs = []
@@ -490,9 +490,12 @@ def cmd_score(args):
                     y = label(kind, int(r.grid_number), issue, int(r.horizon_h), thr)
                     if pp is None or y is None:
                         continue
-                    recs.append({"stamp": r.stamp, "issue_local": issue, "grid_number": int(r.grid_number),
-                                 "horizon_h": int(r.horizon_h), "provider": "persistence",
-                                 "label": kind, "threshold_mm": thr, "p": pp, "y": y})
+                    # persistence_raw: same flags and Brier (metrics clips), ROC on the raw score
+                    # instead of one that ties every cell at or above the threshold
+                    for prov, pv in (("persistence", min(pp, 1.0)), ("persistence_raw", pp)):
+                        recs.append({"stamp": r.stamp, "issue_local": issue, "grid_number": int(r.grid_number),
+                                     "horizon_h": int(r.horizon_h), "provider": prov,
+                                     "label": kind, "threshold_mm": thr, "p": pv, "y": y})
     if not recs:
         log("forecasts logged but none have complete labels yet")
         return
@@ -564,7 +567,7 @@ def cmd_report(args):
 
 XLSX_PATH = OUT_DIR / f"provider_comparison_{LABEL_VERSION}.xlsx"
 PROVIDER_ORDER = ["model", "open_meteo", "google", "accuweather", "weatherapi", "tomorrow",
-                  "openweathermap", "climatology", "persistence"]
+                  "openweathermap", "climatology", "persistence", "persistence_raw"]
 
 
 def cmd_export(args):

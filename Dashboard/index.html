@@ -900,7 +900,8 @@
     const b = t && t.baselines;
     if (!b || !Object.keys(b).length) { table.hidden = true; body.innerHTML = ""; return; }
     const cols = [["pod", 2, +1], ["far", 2, -1], ["csi", 2, +1], ["roc", 2, +1], ["brier", 3, -1]];
-    const rows = [["model", t], ["persistence", b.persistence], ["climatology", b.climatology]]
+    // persistence_raw: the log's "persistence" forecast with its ROC ranked on the raw score
+    const rows = [["model", t], ["persistence", b.persistence_raw], ["climatology", b.climatology]]
       .filter(([, r]) => r);
     const fmt = (v, d) => (v == null ? "—" : v.toFixed(d));
     body.innerHTML = rows.map(([label, r]) => {

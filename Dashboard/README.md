@@ -118,6 +118,14 @@ numbers read as a lift rather than a bare score:
   window [t-h, t) (IMERG pixel-max in mm; flag = "≥ threshold in that window").
   It uses observed rain *up to issue time*, which the live model never has
   (IMERG latency 4 h+), so it is the observation ceiling, not a competitor.
+- **persistence_raw** (since 2026-10-29): the same forecast, flags and Brier, but its
+  ROC ranks the raw score. `persistence` ranks the score clipped at the threshold, which
+  ties every wet cell and reads its ROC low: over 11 Aug–28 Oct that was +0.008 to +0.036
+  per target. The old row is still logged, so earlier report numbers reproduce. The
+  dashboard shows `persistence_raw`.
+  - Hours whose prediction file had already been pruned were backfilled once with
+    `backfill_persistence_raw.py`.
+  - `compare_providers.py` carries the same pair of persistence rows.
 - **climatology** — the cell's observed label frequency for this calendar month
   and hour of day (±1 h pooled) from IMERG 2024-07..2026-07, flagged at the
   deployed model's own probability threshold. The no-skill floor. Built once by
