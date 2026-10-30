@@ -101,6 +101,33 @@ def live_skill():
          f"phase3_live_skill_h1_1mm_by_month_{LABELS}.csv")
 
 
+def lagged_persistence():
+    """Persistence six hours old (the baseline IMERG's latency allows) on the issue hours of the
+    stored live-skill table, so the report can quote it beside Table 23 without moving that table."""
+    t23 = pd.read_csv(OUT / f"phase3_live_skill_vs_baselines_{LABELS}.csv").set_index("target")
+    v = pd.read_csv(DEPLOY / f"v10_verification_log_{LABELS}.csv")
+    b = pd.read_csv(DEPLOY / f"v10_baseline_log_{LABELS}.csv")
+    wide = b.pivot_table(index=["stamp", "target"], columns="baseline", values=["roc_auc", "brier"])
+    wide.columns = [f"{base}_{stat}" for stat, base in wide.columns]
+    j = v.merge(wide.reset_index(), on=["stamp", "target"])
+    j = j.dropna(subset=["roc_auc", "persistence_roc_auc", "climatology_roc_auc", "persistence_lag6h_roc_auc"])
+    rows = []
+    for t in TARGETS:
+        d = j[(j.target == t) & j.issue_local.between(t23.loc[t].first_issue, t23.loc[t].last_issue)]
+        rows.append({
+            "target": t, "issue_hours": len(d), "table23_issue_hours": int(t23.loc[t].issue_hours),
+            "first_issue": d.issue_local.min(), "last_issue": d.issue_local.max(),
+            "model_roc": round(d.roc_auc.mean(), 3),
+            "persistence_lag6h_roc": round(d.persistence_lag6h_roc_auc.mean(), 3),
+            "climatology_roc": round(d.climatology_roc_auc.mean(), 3),
+            "model_brier": round(d.brier.mean(), 3),
+            "persistence_lag6h_brier": round(d.persistence_lag6h_brier.mean(), 3),
+            "climatology_brier": round(d.climatology_brier.mean(), 3),
+            "pct_hours_model_beats_persistence_lag6h_roc": round(100 * (d.roc_auc > d.persistence_lag6h_roc_auc).mean(), 1),
+        })
+    save(pd.DataFrame(rows), f"phase3_live_lagged_persistence_{LABELS}.csv")
+
+
 def coverage():
     on_disk = {m.group(1) for f in os.listdir(DEPLOY) for m in [re.search(r"v10_predictions_(\d{8}_\d{4})", f)] if m}
     tracked = git_stamps("HEAD", "ML_Model_V2/trained_models/om_thailand_rain_v10_deploy")
