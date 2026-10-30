@@ -1,0 +1,19 @@
+{
+  "label_version": "labels_v2",
+  "gap_hours": 24,
+  "train": "2024-07-01 08:00 .. 2025-06-29 20:00",
+  "calibrate": "2025-07-01 00:00 .. 2025-12-30 20:00",
+  "test": "2026-01-01 00:00 .. 2026-07-19 20:00",
+  "rows": {
+    "train": 1817606,
+    "calibrate": 914634,
+    "test": 997934
+  },
+  "configs": {
+    "om_only": [],
+    "hw_allseason": [
+      "hw_block_offset0.npy"
+    ]
+  },
+  "booster_recipe": "Thailand_Rain_V10_deploy.fit_full (V13 params)"
+}

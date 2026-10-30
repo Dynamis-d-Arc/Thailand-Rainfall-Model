@@ -40,7 +40,9 @@ root-level notebooks and scripts and most of them are superseded.
 - Bangkok ladder: `BKK_Rain_V3..V7_*.py`. Thailand ladder:
   `Thailand_Rain_V3.py` (nationwide panel, IMERG labels), `V7` (Himawari IR,
   the main gain), `V8` (forecast-staleness gate), `V9` (2026 warm-rain decay),
-  `V10` (deploy), `V12` (multiband pilot, not deployed), `V13` (dry season).
+  `V10` (deploy), `V12` (multiband pilot, not deployed), `V13` (dry season),
+  `V14` (forward-in-time replay of the deploy recipe: train 2024-07..2025-06, calibrate
+  2025-07..12, test 2026; checks the blocked CV and the random calibration split).
 - Each experiment writes to `ML_Model_V2/trained_models/<experiment_name>/`.
   Search there for stored metrics, fold tables and manifests.
 - `ML_Model_V2/_th_cache_labels_v2/`, `_v3_cache_labels_v2/`, `cache/` are regenerable fold
