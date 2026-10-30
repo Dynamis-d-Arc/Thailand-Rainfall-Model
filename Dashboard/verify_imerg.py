@@ -96,15 +96,17 @@ def log(msg):
 
 
 def prediction_issues():
-    """[(stamp, issue_ts, csv_path)] for every prediction on disk, oldest first."""
+    """[(stamp, issue_ts, csv_path)] for every prediction on disk, oldest first.
+    Includes archive/*.csv.gz (rainwatch_server.prune_old) so a relabel can rescore them."""
     out = []
-    for p in sorted(PRED_DIR.glob("v10_predictions_*.csv")):
-        stamp = p.stem.replace("v10_predictions_", "")
+    for p in [*PRED_DIR.glob("v10_predictions_*.csv"),
+              *(PRED_DIR / "archive").glob("v10_predictions_*.csv.gz")]:
+        stamp = p.name.split(".")[0].replace("v10_predictions_", "")
         try:
             out.append((stamp, datetime.strptime(stamp, "%Y%m%d_%H%M"), p))
         except ValueError:
             log(f"skipping unparseable stamp {stamp}")
-    return out
+    return sorted(out)
 
 
 def targets_from_columns(cols):

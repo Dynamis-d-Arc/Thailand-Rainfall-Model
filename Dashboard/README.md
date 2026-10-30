@@ -19,8 +19,11 @@ Manage both in Task Scheduler; `start_rainwatch.bat` remains for manual runs
 on a machine without the tasks (it will fail to bind port 8901 if the task's
 server is already running). Dashboard: http://localhost:8901.
 
-Raw hourly prediction CSVs are pruned after 30 days (`RETENTION_DAYS`); the
-verification and health logs keep the distilled record indefinitely.
+Raw hourly prediction CSVs leave the live set after 30 days (`RETENTION_DAYS`)
+and move to `om_thailand_rain_v10_deploy/archive/` as `.csv.gz` (about 16 KB each),
+where `verify_imerg.py` still finds them, so a label change can rescore every hour.
+Until 30 Oct 2026 they were deleted instead, and 231 local-only hours from 6-27 Sep
+(before the cloud job existed) are gone for good. The `predictions` branch never prunes.
 
 What the server does:
 

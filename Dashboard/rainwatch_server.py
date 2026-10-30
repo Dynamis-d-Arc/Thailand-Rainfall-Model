@@ -19,6 +19,7 @@ it turns the dashboard into a pure viewer of cloud-produced predictions.
 """
 
 import argparse
+import gzip
 import json
 import os
 import subprocess
@@ -50,8 +51,8 @@ PREDICT_TIMEOUT = 25 * 60
 VERIFY_INTERVAL = 6 * 3600      # how often the IMERG verification loop wakes up
 VERIFY_TIMEOUT = 45 * 60
 VERIFY_MIN_AGE_H = 7            # IMERG Late Run latency margin passed to the verifier
-RETENTION_DAYS = 30             # raw hourly prediction CSVs older than this are pruned
-                                # (the verification/health logs keep the distilled record)
+RETENTION_DAYS = 30             # raw hourly prediction CSVs older than this leave the live set
+                                # for PRED_DIR/archive/ as .csv.gz (kept so they can be rescored)
 # Windows: a windowless parent (pythonw, as the scheduled task runs us) spawning a
 # CONSOLE program gets a fresh console allocated for it - a black window that flashes
 # on the user's desktop. git.exe is a console program and the sync loop calls it every
@@ -106,8 +107,11 @@ def csv_to_json(csv_path: Path, out_path: Path):
 
 
 def prune_old():
+    """Move snapshots older than RETENTION_DAYS to archive/ as .csv.gz, never delete them:
+    6-27 Sep 2026 (231 local-only hours) were lost to the old unlink and could not be rescored."""
     cutoff = bkk_now() - timedelta(days=RETENTION_DAYS)
-    removed = 0
+    archive = PRED_DIR / "archive"
+    moved = 0
     for p in PRED_DIR.glob("v10_predictions_*.csv"):
         stamp = p.stem.replace("v10_predictions_", "")
         try:
@@ -115,11 +119,16 @@ def prune_old():
         except ValueError:
             continue
         if ts < cutoff:
+            archive.mkdir(exist_ok=True)
+            dest = archive / (p.name + ".gz")
+            tmp = archive / (p.name + ".gz.tmp")
+            tmp.write_bytes(gzip.compress(p.read_bytes(), mtime=0))   # mtime=0: same bytes on every re-run
+            os.replace(tmp, dest)
             p.unlink()
             (DATA / f"pred_{stamp}.json").unlink(missing_ok=True)
-            removed += 1
-    if removed:
-        log(f"pruned {removed} prediction snapshot(s) older than {RETENTION_DAYS} d")
+            moved += 1
+    if moved:
+        log(f"archived {moved} prediction snapshot(s) older than {RETENTION_DAYS} d")
 
 
 def convert_all():

@@ -1,4 +1,4 @@
-"""Self-check for rainwatch_server.predict_tick and _failure_record.
+"""Self-check for rainwatch_server.predict_tick, _failure_record and prune_old.
 
 Run:  python Dashboard/test_predict_tick.py   (plain asserts, no pytest needed)
 """
@@ -125,6 +125,23 @@ def test_failure_record_keeps_exit_code_and_full_output():
         assert msg.startswith("predict exited 1: ValueError: boom [full output: data/predict_fail_20261026_114752.log]")
         saved = (Path(tmp) / "predict_fail_20261026_114752.log").read_text()
         assert "exit code: 1" in saved and saved.count("line one") == 50 and "ValueError: boom" in saved
+
+
+def test_prune_archives_old_snapshots_instead_of_deleting():
+    import gzip
+    with tempfile.TemporaryDirectory() as tmp:
+        clock = [datetime(2026, 10, 30, 12, 0)]
+        make_env(tmp, clock, ["ok"])
+        old, recent = Path(tmp) / "v10_predictions_20260901_0100.csv", Path(tmp) / "v10_predictions_20261029_0100.csv"
+        old.write_bytes(b"grid_number,p\n1,0.5\n")
+        recent.write_text("x")
+        (Path(tmp) / "pred_20260901_0100.json").write_text("{}")
+        rs.prune_old()
+        archived = Path(tmp) / "archive" / "v10_predictions_20260901_0100.csv.gz"
+        assert not old.exists() and recent.exists()
+        assert gzip.decompress(archived.read_bytes()) == b"grid_number,p\n1,0.5\n"
+        assert not (Path(tmp) / "pred_20260901_0100.json").exists()
+        assert not list((Path(tmp) / "archive").glob("*.tmp"))
 
 
 if __name__ == "__main__":

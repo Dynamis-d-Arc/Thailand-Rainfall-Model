@@ -77,6 +77,10 @@ root-level notebooks and scripts and most of them are superseded.
   pre-fix history (window `[t+1, t+1+h)` on `precipitation_max_mm`) and are
   never rewritten. See `Docs/label_fix_2026-10-27.md`.
 - Prediction stamps are Bangkok local hours (`v10_predictions_YYYYMMDD_HHMM.csv`).
+  After 30 days they move to `om_thailand_rain_v10_deploy/archive/*.csv.gz`; never delete them.
+- The live build (`model_build` 2026-10-28 02:59:33) is **frozen** for prospective evaluation
+  since 2026-10-30: do not refit, replace or re-threshold `deploy/*.joblib` without the user's
+  OK. New candidates go in their own experiment dir.
 - Any claim in a report must trace to a stored output, code, or the DB.
 - `*.joblib`, `*.npy`, `*.npz`, `*.log` are gitignored except the `deploy/`
   artifacts the cloud job needs.
