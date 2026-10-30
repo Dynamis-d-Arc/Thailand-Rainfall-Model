@@ -92,6 +92,27 @@ def test_lagged_persistence_reads_hours_six_before_issue_and_om_only_reads_its_c
     assert "om_only" not in {r["baseline"] for r in base}   # files before the shadow: skipped
 
 
+def test_publication_delay_counts_own_runs_and_drops_pulled_files():
+    import publication_delay as pub
+    t = pd.Timestamp
+    local = pd.DataFrame({"stamp": ["20261030_1500", "20261030_1600", "20261030_1700", "20261030_1800"],
+                          "local_written": [t("2026-10-30 15:12"), t("2026-10-30 19:40"),
+                                            t("2026-10-30 17:30"), t("2026-10-30 18:13")],
+                          "local_source": ["mtime", "mtime", "written_local", "written_local"],
+                          "written_by": [None, None, "github-actions", "local"]})
+    cloud = pd.DataFrame({"stamp": ["20261030_1500", "20261030_1600", "20261030_1700", "20261030_1900"],
+                          "cloud_committed": [t("2026-10-30 15:33"), t("2026-10-30 16:34"),
+                                              t("2026-10-30 17:31"), t("2026-10-30 19:35")]})
+    d = pub.delays(local, cloud).set_index("stamp")
+    assert d.local_kind.iloc[:4].tolist() == ["own", "pulled", "pulled", "own"]
+    assert pd.isna(d.local_kind.iloc[4])                                   # no local file at all
+    assert d.loc["20261030_1500", "first_delay_min"] == 12.0              # own run beat the cloud
+    assert pd.isna(d.loc["20261030_1600", "local_delay_min"])             # synced after waking: no local delay
+    assert d.loc["20261030_1600", "first_delay_min"] == 34.0
+    assert d.loc["20261030_1800", "first_delay_min"] == 13.0              # local only
+    assert d.loc["20261030_1900", "first_delay_min"] == 35.0              # cloud only
+
+
 def test_climatology_window_and_missing_hours():
     values = np.array([[0.0, 1.0, 0.0, np.nan, 2.0, 0.5]])
     h1 = clim.forward_window_max(values, 1)[0]

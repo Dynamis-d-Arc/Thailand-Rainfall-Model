@@ -24,6 +24,7 @@
 # %%
 import gc
 import json
+import os
 import sys
 import time
 
@@ -566,6 +567,9 @@ def phase_predict():
     # metric (cold235 at issue time joined against next-hour IMERG labels)
     out["hw_cold235_env_lag1"] = np.round(ir[:, 4].astype(float), 4)
     out["hw_valid"] = ir[:, 11].astype(int)
+    # the window starts at the issue hour, so this is how much of it had passed
+    out["written_local"] = pd.Timestamp.now(tz="Asia/Bangkok").strftime("%Y-%m-%d %H:%M:%S")
+    out["written_by"] = "github-actions" if os.environ.get("GITHUB_ACTIONS") == "true" else "local"
     stamp = pd.Timestamp(issue).strftime("%Y%m%d_%H%M")
     path = OUTPUT_DIR / f"v10_predictions_{stamp}.csv"
     out.to_csv(path, index=False)

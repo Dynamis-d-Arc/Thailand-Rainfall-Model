@@ -53,9 +53,10 @@ the CSV to the `predictions` branch; the server's sync loop pulls those in.
 
 The cloud job needs no database and no secrets: Open-Meteo is public, the NOAA
 Himawari buckets are read unsigned, and the static 833-cell grid comes from the
-committed `deploy/th_grid_25km.csv` instead of Postgres. Output is bit-identical
-to a local run - verified against the same issue hour, max probability
-difference 0.00000 across all six targets.
+committed `deploy/th_grid_25km.csv` instead of Postgres. Its probabilities are
+identical to a local run - verified against the same issue hour, max probability
+difference 0.00000 across all six targets. Since 2026-10-30 the two files differ
+only in `written_local` and `written_by` (see below).
 
 The pull is read-only with respect to the working tree: it updates a
 remote-tracking ref and reads blobs out of it, never checking anything out or
@@ -84,10 +85,40 @@ The server merges both into `Dashboard/data/health.json` at every conversion.
 mature predictions (issue + 6 h + 7 h IMERG-latency margin) against observed
 rain, using the exact training label — the wettest IMERG pixel's hourly total
 (`precipitation_pixelmax_mm`, complete hours) ≥ threshold in ANY of the h hours
-starting at the issue hour, i.e. the window [t, t+h). A prediction for issue
-hour t is published about 13–20 minutes after t (laptop runs from :10, the
-cloud job from :15, ~2.4 min per run), so the first quarter-hour of the +1 h
-window has already elapsed when it appears.
+starting at the issue hour, i.e. the window [t, t+h). A forecast only exists
+some minutes into that window, so part of every window has passed when it
+appears (next section).
+
+### Publication delay
+
+Each prediction CSV carries `written_local` (Bangkok time the file was written)
+and `written_by` (`local` or `github-actions`) since 2026-10-30; the page shows
+"Window from 16:00 · written 16:12" and, under the horizon buttons, how many
+minutes of the chosen window had passed. `publication_delay.py` measures it for
+every issue so far and writes `v10_publication_delay.csv`:
+
+- **local** - this PC's own predict, from `written_local` or, on older files, the
+  file's modification time. Files the server pulled from the cloud are marked
+  `pulled` and get no local delay (on older files: modified after the cloud commit).
+- **cloud** - the first `prediction <stamp>` commit on the `predictions` branch,
+  read from a blobless clone, so no CSVs are downloaded.
+- **first** - the earlier of the two, when the forecast first existed anywhere.
+
+28 Sep 16:00 to 30 Oct 16:00:
+
+| publisher | issues | p10 | median | p90 | share > 20 min |
+|---|---|---|---|---|---|
+| local | 300 | 12.3 min | 13.6 min | 18.9 min | 7% |
+| cloud | 751 | 25.7 min | 34.2 min | 35.2 min | 92% |
+| first | 757 | 12.4 min | 31.4 min | 34.8 min | 56% |
+
+The cloud job is scheduled for :15 but GitHub starts it late, so its commits land
+around :34. This PC wrote its own copy for only 300 of the 757 hours (it sleeps;
+snapshots archived before 30 Sep are not read), so for most issues the first copy
+is the cloud's. At the median, the +1 h forecast is published with
+about half of its window left. The scores cannot be cut to the part after
+publication, since IMERG is hourly. What changes is the lead time a report can
+claim.
 
 Label history: until 2026-10-27 the loop scored the window [t+1, t+1+h) on
 `precipitation_max_mm`, which is 0.5·max(first half-hour) + 0.5·max(second

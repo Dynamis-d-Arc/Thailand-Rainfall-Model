@@ -144,6 +144,21 @@ def test_prune_archives_old_snapshots_instead_of_deleting():
         assert not list((Path(tmp) / "archive").glob("*.tmp"))
 
 
+def test_page_json_carries_the_write_time_only_when_logged():
+    import json
+    import pandas as pd
+    row = {"grid_number": 1, "longitude": 100.0, "latitude": 13.0, "issue_local": "2026-10-30 16:00:00",
+           **{c: 0.5 for c in rs.P_COLS}, **{c: 1 for c in rs.F_COLS}}
+    with tempfile.TemporaryDirectory() as tmp:
+        src, out = Path(tmp) / "p.csv", Path(tmp) / "p.json"
+        pd.DataFrame([row]).to_csv(src, index=False)
+        rs.csv_to_json(src, out)
+        assert json.loads(out.read_text())["written"] is None          # files before 30 Oct
+        pd.DataFrame([{**row, "written_local": "2026-10-30 16:12:04"}]).to_csv(src, index=False)
+        rs.csv_to_json(src, out)
+        assert json.loads(out.read_text())["written"] == "2026-10-30 16:12"
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

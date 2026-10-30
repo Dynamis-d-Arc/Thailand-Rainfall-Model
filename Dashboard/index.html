@@ -375,7 +375,7 @@
     </div>
 
     <div class="stamp-row">
-      <span class="chip" id="issueChip"><span class="dot"></span><span>Issued <b id="issueTime">—</b></span></span>
+      <span class="chip" id="issueChip"><span class="dot"></span><span>Window from <b id="issueTime">—</b></span></span>
       <span class="chip" id="serverChip"><span class="dot"></span><span id="serverText">server —</span></span>
     </div>
 
@@ -388,6 +388,7 @@
         <button type="button" data-h="1" aria-pressed="false">+3 h</button>
         <button type="button" data-h="2" aria-pressed="false">+6 h</button>
       </div>
+      <p class="health-note" id="windowNote"></p>
       <p class="panel-label">Rain threshold</p>
       <div class="seg" id="segThr" role="group" aria-label="Rain threshold">
         <button type="button" data-t="0" aria-pressed="true">&ge; 0.1 mm — any rain</button>
@@ -646,7 +647,24 @@
       d.title = `${n} cells at p ≈ ${(b / NB).toFixed(2)}–${((b + 1) / NB).toFixed(2)}`;
       hb.appendChild(d);
     });
+    renderWindow();
     renderVerify();
+  }
+
+  // the +h window starts AT the issue hour; say how much of it had passed when written
+  const bkkDate = s => new Date(s.replace(" ", "T") + ":00+07:00");
+  const hhmm = d => d.toLocaleTimeString("en-GB",
+    { timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit" });
+  function renderWindow() {
+    if (!state.issue) return;
+    const h = [1, 3, 6][state.h], start = bkkDate(state.issue);
+    let txt = `Covers ${hhmm(start)}–${hhmm(new Date(+start + h * 3.6e6))} Bangkok time.`;
+    if (state.written) {
+      const w = bkkDate(state.written), late = Math.round((w - start) / 6e4);
+      txt += late >= h * 60 ? ` Written ${hhmm(w)}, after the window had ended.`
+                            : ` Written ${hhmm(w)}, ${late} min into it.`;
+    }
+    document.getElementById("windowNote").textContent = txt;
   }
 
   // ---------- data loading ----------
@@ -664,6 +682,8 @@
     const data = await fetchJson(`data/pred_${stamp}.json`);
     cells = data.cells;
     state.stamp = stamp;
+    state.issue = data.issue;
+    state.written = data.written || null;
     state.viewingLatest = stamp === latestStamp;
 
     const lons = [...new Set(cells.map(c => c[1]))].sort((a, b) => a - b);
@@ -682,11 +702,12 @@
 
   function updateIssueChip(issueStr) {
     const chip = document.getElementById("issueChip");
-    const age = (Date.now() - new Date(issueStr.replace(" ", "T"))) / 3.6e6;
+    const age = (Date.now() - bkkDate(issueStr)) / 3.6e6;   // Bangkok stamp, any browser clock
     const stale = state.viewingLatest && age > 2.5;
     chip.classList.toggle("warn", stale);
     chip.querySelector("span:last-child").innerHTML =
-      `Issued <b>${issueStr}</b>` + (stale ? ` · stale (${age.toFixed(1)} h old)` : "");
+      `Window from <b>${issueStr}</b>` + (state.written ? ` · written ${state.written.slice(11)}` : "") +
+      (stale ? ` · stale (${age.toFixed(1)} h old)` : "");
   }
 
   function renderIssueOptions(issues) {
@@ -729,12 +750,13 @@
   }
 
   function nextRunLabel(runMinute) {
-    const now = new Date();
-    const cur = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}00`;
+    const now = new Date(Date.now() + 7 * 3.6e6);   // Bangkok wall clock in the UTC fields, any browser zone
+    const p2 = n => String(n).padStart(2, "0");
+    const cur = `${now.getUTCFullYear()}${p2(now.getUTCMonth() + 1)}${p2(now.getUTCDate())}_${p2(now.getUTCHours())}00`;
     const d = new Date(now);
-    if (latestStamp === cur || now.getMinutes() >= (runMinute || 10)) d.setHours(d.getHours() + 1);
-    d.setMinutes(runMinute || 10);
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    if (latestStamp === cur || now.getUTCMinutes() >= (runMinute || 10)) d.setUTCHours(d.getUTCHours() + 1);
+    d.setUTCMinutes(runMinute || 10);
+    return `${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
   }
 
   // ---------- V9 health metric ----------
@@ -876,8 +898,9 @@
       if (t.provisional_share != null && t.provisional_share > 0.5)
         foot += " · provisional Late Run labels";
       if (VDATA.pending) foot += ` · ${VDATA.pending} awaiting labels`;
-      foot += ". +h = the h hours starting at the issue hour (a prediction appears about " +
-        "13-20 min into that window). POD = share of observed rain the alerts caught; FAR = " +
+      foot += ". +h = the h hours starting at the issue hour, and a forecast is only written " +
+        "partway into that window: a median 14 min in when this PC runs it, 34 min in from the " +
+        "cloud (28 Sep to 30 Oct, v10_publication_delay.csv). POD = share of observed rain the alerts caught; FAR = " +
         "share of alerts that were dry; Brier = probability error (lower is better).";
       if (t.baselines)
         foot += " Persistence = \"it rained in the hour before issue, so it will rain\" using " +

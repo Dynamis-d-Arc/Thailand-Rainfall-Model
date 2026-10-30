@@ -102,7 +102,10 @@ def csv_to_json(csv_path: Path, out_path: Path):
                       round(float(d["longitude"]), 4),
                       round(float(d["latitude"]), 4)]
                      + [round(float(d[c]), 3) for c in P_COLS] + [flags])
-    payload = {"issue": str(df["issue_local"].iloc[0])[:16], "cells": cells}
+    payload = {"issue": str(df["issue_local"].iloc[0])[:16],
+               # files before 2026-10-30 have no written_local; the page then shows none
+               "written": str(df["written_local"].iloc[0])[:16] if "written_local" in df else None,
+               "cells": cells}
     atomic_write(out_path, json.dumps(payload, separators=(",", ":")))
 
 
