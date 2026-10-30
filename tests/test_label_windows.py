@@ -66,6 +66,32 @@ def test_persistence_raw_changes_only_the_roc(tmp_path):
     assert raw["roc_auc"] != old["roc_auc"]                               # the clip ties wet cells
 
 
+def test_lagged_persistence_reads_hours_six_before_issue_and_om_only_reads_its_columns(tmp_path):
+    from sklearn.metrics import roc_auc_score
+    rng = np.random.default_rng(1)
+    cells = np.arange(1, verify.N_CELLS + 1)
+    lag = verify.hist_hours(ISSUE, verify.AVAILABLE_LAG_H)
+    assert lag[-1] == ISSUE - timedelta(hours=7)                 # h1 reads [issue-7, issue-6)
+    assert not set(lag) & set(verify.hist_hours(ISSUE))
+    hours = lag[-1:] + verify.lead_hours(ISSUE)[:1]
+    pmax = pd.DataFrame(rng.gamma(0.5, 2.0, (len(cells), 2)), index=cells, columns=hours)
+    om_p = rng.random(len(cells))
+    pred = pd.DataFrame({"grid_number": cells, "p_h1_1.0mm": 0.5, "flag_h1_1.0mm": 1,
+                         "om_p_h1_1.0mm": om_p, "om_flag_h1_1.0mm": (om_p > 0.5).astype(int)})
+    path = tmp_path / "pred.csv"
+    pred.to_csv(path, index=False)
+    _, base, _ = verify.score_issue("x", ISSUE, path, pmax, None, {("x", "h1_1.0mm")}, set(), None, {})
+    rows = {r["baseline"]: r for r in base}
+    y = (pmax[hours[1]] >= 1.0).astype(int)
+    assert rows["persistence_lag6h"]["roc_auc"] == round(roc_auc_score(y, pmax[hours[0]]), 4)
+    assert rows["om_only"]["roc_auc"] == round(roc_auc_score(y, om_p), 4)
+    assert "persistence" not in rows          # its [issue-1, issue) hour is absent here
+
+    pred.drop(columns=["om_p_h1_1.0mm", "om_flag_h1_1.0mm"]).to_csv(path, index=False)
+    _, base, _ = verify.score_issue("x", ISSUE, path, pmax, None, {("x", "h1_1.0mm")}, set(), None, {})
+    assert "om_only" not in {r["baseline"] for r in base}   # files before the shadow: skipped
+
+
 def test_climatology_window_and_missing_hours():
     values = np.array([[0.0, 1.0, 0.0, np.nan, 2.0, 0.5]])
     h1 = clim.forward_window_max(values, 1)[0]

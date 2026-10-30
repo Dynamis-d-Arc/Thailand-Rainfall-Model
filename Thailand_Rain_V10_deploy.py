@@ -19,6 +19,7 @@
 # Phases:
 #     python Thailand_Rain_V10_deploy.py fit       # ~6 fits, saves deploy/ artifacts
 #     python Thailand_Rain_V10_deploy.py verify    # reload artifacts, sanity-score June 2026
+#     python Thailand_Rain_V10_deploy.py shadow    # om_only reference models, deploy/shadow_om_only_*
 
 # %%
 import gc
@@ -560,6 +561,7 @@ def phase_predict():
     # which fit produced this file (bundles fitted before 2026-10-28 carry neither key)
     out["model_build"] = min(b for b in builds) if all(builds) else ""
     out["label_version"] = "|".join(sorted(v for v in label_versions if v))
+    out = add_shadow_om_only(out, om)
     # per-cell IR context so the verification loop can compute the labeled V9 health
     # metric (cold235 at issue time joined against next-hour IMERG labels)
     out["hw_cold235_env_lag1"] = np.round(ir[:, 4].astype(float), 4)
@@ -605,6 +607,63 @@ def phase_predict():
         f"({len(hlog)} runs logged)")
 
 
+# %% [markdown]
+# ## Phase `shadow` — the om_only reference forecast on live hours
+#
+# The same full-panel recipe as the live V13 fit (fit_full, all 13 blocks, F1 thresholds
+# from the all-fold OOF) on the 66 OM features alone. `predict` writes its probabilities as
+# om_p_* / om_flag_* next to the live forecast and the verify loop scores them as the
+# `om_only` baseline, so the IR gain can be read on identical live cells and hours. It never
+# replaces the live th_rain_* models, and a shadow failure never blocks the prediction file.
+
+# %%
+def shadow_path(tname):
+    return DEPLOY_DIR / f"shadow_om_only_{tname}.joblib"
+
+
+def phase_shadow():
+    from Thailand_Rain_V3 import LABEL_VERSION
+    y = np.load(CACHE / "y.npy")
+    x = np.load(CACHE / "base_X.npy")
+    oof = np.load(CACHE / "oof_cal_om_only.npy")
+    log(f"om_only shadow fit: {len(y):,} rows x {x.shape[1]} features")
+    for i, (horizon, threshold_mm) in enumerate(TARGETS):
+        tname = TARGET_NAMES[i]
+        if shadow_path(tname).exists():
+            log(f"  {tname}: exists, skipping (delete to refit)")
+            continue
+        t0 = time.time()
+        m = np.isfinite(oof[:, i])
+        op_threshold = pick_threshold(oof[m, i], y[m, i])
+        rng = np.random.default_rng([RANDOM_STATE, 131, i])
+        model, calibrator = fit_full(x, y[:, i], MODEL_PLAN[horizon], rng)
+        joblib.dump({
+            "model": model, "calibrator": calibrator, "threshold": op_threshold,
+            "feature_names": FEATURE_COLUMNS, "target": tname, "horizon_h": horizon,
+            "rain_threshold_mm": threshold_mm, "trained_rows": int(len(y)),
+            "built": time.strftime("%Y-%m-%d %H:%M:%S"), "label_version": LABEL_VERSION,
+            "notes": "om_only shadow (no IR) for live scoring only; never the live forecast",
+        }, shadow_path(tname), compress=3)
+        log(f"  {tname}: threshold {op_threshold:.2f}, fit {(time.time() - t0) / 60:.1f} min")
+
+
+def add_shadow_om_only(out, om):
+    """om_p_* / om_flag_* columns from the shadow models; the file is unchanged without them."""
+    try:
+        xo = om.to_numpy(dtype="float32")
+        cols = {}
+        for tname in TARGET_NAMES:
+            d = joblib.load(shadow_path(tname))
+            assert list(d["feature_names"]) == list(om.columns), "shadow feature order differs"
+            prob = d["calibrator"].predict(d["model"].predict_proba(xo)[:, 1])
+            cols[f"om_p_{tname}"] = np.round(prob, 4)
+            cols[f"om_flag_{tname}"] = (prob >= d["threshold"]).astype(int)
+        return out.assign(**cols)
+    except Exception as exc:                      # the live forecast must never depend on it
+        log(f"WARNING: om_only shadow skipped: {type(exc).__name__}: {exc}")
+        return out
+
+
 # %%
 if __name__ == "__main__":
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -619,6 +678,8 @@ if __name__ == "__main__":
         phase_parity()
     elif phase == "predict":
         phase_predict()
+    elif phase == "shadow":
+        phase_shadow()
     else:
-        raise SystemExit(f"unknown phase {phase!r}; use fit | verify | parity | predict")
+        raise SystemExit(f"unknown phase {phase!r}; use fit | verify | parity | predict | shadow")
     log(f"phase {phase} done in {(time.time() - t0) / 60:.1f} min")

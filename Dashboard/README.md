@@ -110,7 +110,7 @@ predict phase now writes into each prediction CSV
 for the active layer ("Skill vs observed rain") and plots live-labeled months
 as hollow points on the IR-health chart.
 
-The same run also scores two reference forecasts on exactly the same (issue,
+The same run also scores reference forecasts on exactly the same (issue,
 target, cells) and appends them to `v10_baseline_log_labels_v2.csv`, so the model's live
 numbers read as a lift rather than a bare score:
 
@@ -124,18 +124,32 @@ numbers read as a lift rather than a bare score:
   per target. The old row is still logged, so earlier report numbers reproduce. The
   dashboard shows `persistence_raw`.
   - Hours whose prediction file had already been pruned were backfilled once with
-    `backfill_persistence_raw.py`.
+    `backfill_persistence_raw.py`. Since the prune now archives instead of deleting,
+    `--backfill` (below) covers this and the script is only history.
   - `compare_providers.py` carries the same pair of persistence rows.
+- **persistence_lag6h** (since 2026-10-30): the same rule on the window
+  [t-6-h, t-6), roughly what IMERG has published by issue time (`AVAILABLE_LAG_H`
+  in `verify_imerg.py`). Flags and Brier clip at the threshold like `persistence`;
+  its ROC ranks the raw score like `persistence_raw`. This is the persistence a
+  real forecaster could actually run, so the model should beat it.
+- **om_only** (since 2026-10-30): the same recipe without the Himawari features,
+  fitted once on the same panel by `Thailand_Rain_V10_deploy.py shadow` into
+  `deploy/shadow_om_only_*.joblib` (F1 threshold from its own OOF). Each predict
+  run adds `om_p_*` / `om_flag_*` columns beside the live ones; the live forecast
+  never reads them. Issues from before the shadow existed have no such columns and
+  get no `om_only` row, so the dashboard shows its issue count when it is smaller.
 - **climatology** — the cell's observed label frequency for this calendar month
   and hour of day (±1 h pooled) from IMERG 2024-07..2026-07, flagged at the
   deployed model's own probability threshold. The no-skill floor. Built once by
   `build_climatology.py` into `v10_climatology_labels_v2.csv.gz`; rebuild after
   a major IMERG backfill.
 
-The "Skill vs observed rain" panel shows a model / persistence / climatology
-table for the active layer; a reference cell is green where the model beats
-it and red where it does not. Baselines for issues scored before the log
-existed are backfilled automatically on the next cycle.
+The "Skill vs observed rain" panel shows the model against these references
+for the active layer; a reference cell is green where the model beats it and
+red where it does not. A routine cycle fills a missing baseline row only for
+issues from the last 30 days (`RECENT_DAYS`), so adding a baseline does not
+re-score the whole archive every 6 h. For older issues run it once by hand:
+`python Dashboard/verify_imerg.py --backfill --no-fetch`.
 
 Issues whose labels haven't reached GEE yet simply stay pending and are retried
 next cycle. `--no-verify` disables the loop; `--no-predict` disables both loops.

@@ -83,7 +83,9 @@ root-level notebooks and scripts and most of them are superseded.
   After 30 days they move to `om_thailand_rain_v10_deploy/archive/*.csv.gz`; never delete them.
 - The live build (`model_build` 2026-10-28 02:59:33) is **frozen** for prospective evaluation
   since 2026-10-30: do not refit, replace or re-threshold `deploy/*.joblib` without the user's
-  OK. New candidates go in their own experiment dir.
+  OK. New candidates go in their own experiment dir. The freeze covers `th_rain_*`;
+  `deploy/shadow_om_only_*.joblib` are no-IR reference models scored beside it
+  (`om_only` baseline), never the live forecast.
 - Any claim in a report must trace to a stored output, code, or the DB.
 - `*.joblib`, `*.npy`, `*.npz`, `*.log` are gitignored except the `deploy/`
   artifacts the cloud job needs.

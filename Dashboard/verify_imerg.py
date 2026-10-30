@@ -82,10 +82,19 @@ MAX_LEAD = 6
 #                  cell, so its ROC reads low (2026-10-29: 0.005-0.025 on average). This row
 #                  ranks the raw score. `persistence` is still logged unchanged so earlier
 #                  numbers reproduce.
+#   persistence_lag6h - persistence a live system could actually issue: the same raw-score
+#                  forecast from the `horizon` hours ending AVAILABLE_LAG_H before issue,
+#                  [issue-6-h, issue-6). 6 h is the protocol's deployable IMERG lag
+#                  (BKK_Rain_V3.IMERG_DEPLOY_LAG_HOURS), about the Early Run's latency; the
+#                  Late Run this table holds lands later, so this is generous to persistence.
 #   climatology  - per-cell, per-month, per-hour-of-day observed label frequency from
 #                  2024-07..2026-07 (build_climatology.py); flagged with the same
 #                  probability threshold as the deployed model for that target.
-BASELINES = ("persistence", "persistence_raw", "climatology")
+#   om_only      - the no-IR shadow model's om_p_* / om_flag_* columns (Thailand_Rain_V10_deploy
+#                  `shadow`), scored only on prediction files that carry them (2026-10-30 on).
+BASELINES = ("persistence", "persistence_raw", "persistence_lag6h", "climatology", "om_only")
+AVAILABLE_LAG_H = 6
+RECENT_DAYS = 30   # baseline gaps on older issues are filled only by an explicit --backfill run
 
 DB_CONFIG = {
     "host": os.getenv("PGHOST", "localhost"),
@@ -213,9 +222,10 @@ def lead_hours(issue):
     return [issue + timedelta(hours=k) for k in range(MAX_LEAD)]
 
 
-def hist_hours(issue):
-    """The 6 observed hours before the issue hour, oldest first: [issue-6, issue)."""
-    return [issue - timedelta(hours=k) for k in range(MAX_LEAD, 0, -1)]
+def hist_hours(issue, lag=0):
+    """The 6 observed hours ending `lag` hours before the issue hour, oldest first:
+    [issue-lag-6, issue-lag)."""
+    return [issue - timedelta(hours=lag + k) for k in range(MAX_LEAD, 0, -1)]
 
 
 def load_labels(conn, lo, hi):
@@ -249,13 +259,16 @@ def score_issue(stamp, issue, csv_path, pmax, rt, done, done_base, clim, thr_map
             m[h] = pmax[h].reindex(pred.index) if (pmax is not None and h in pmax.columns) \
                 else np.nan
         return m
-    lead, hist = aligned(leads), aligned(hist_hrs)
+    lag_hrs = hist_hours(issue, AVAILABLE_LAG_H)
+    lead, hist, hist_lag = aligned(leads), aligned(hist_hrs), aligned(lag_hrs)
 
     for name, horizon, thr in targets_from_columns(pred.columns):
         need_model = (stamp, name) not in done
         need_base = {b: (stamp, name, b) not in done_base for b in BASELINES}
         if clim is None:
             need_base["climatology"] = False
+        if f"om_p_{name}" not in pred.columns:
+            need_base["om_only"] = False
         if not need_model and not any(need_base.values()):
             continue
         window = lead[leads[:horizon]]
@@ -312,6 +325,21 @@ def score_issue(stamp, issue, csv_path, pmax, rt, done, done_base, clim, thr_map
                     base_rows.append({**common, "baseline": "persistence_raw",
                                       **metrics(y_p, score / thr, score >= thr), "scored_at": now_str})
 
+        if need_base["persistence_lag6h"]:
+            stale = hist_lag[lag_hrs[-horizon:]]
+            ok_l = ok & stale.notna().all(axis=1)
+            if int(ok_l.sum()) >= MIN_COVERAGE * N_CELLS:
+                score = stale[ok_l].max(axis=1).to_numpy()
+                base_rows.append({**common, "baseline": "persistence_lag6h",
+                                  **metrics((window[ok_l] >= thr).any(axis=1).astype(int).to_numpy(),
+                                            score / thr, score >= thr), "scored_at": now_str})
+
+        if need_base["om_only"]:
+            base_rows.append({**common, "baseline": "om_only",
+                              **metrics(y, pred.loc[ok, f"om_p_{name}"].to_numpy(),
+                                        pred.loc[ok, f"om_flag_{name}"].to_numpy()),
+                              "scored_at": now_str})
+
         if need_base["climatology"]:
             try:
                 c = clim.loc[(issue.month, issue.hour)]
@@ -354,6 +382,9 @@ def main():
     ap.add_argument("--no-fetch", action="store_true",
                     help="score against whatever IMERG is already in the table")
     ap.add_argument("--max-issues", type=int, default=None)
+    ap.add_argument("--backfill", action="store_true",
+                    help=f"also fill missing baselines on issues older than {RECENT_DAYS} days "
+                         "(the archive); pair with --no-fetch, the labels are already stored")
     args = ap.parse_args()
 
     done = scored_pairs()
@@ -364,11 +395,17 @@ def main():
     mature = [(s, t, p) for s, t, p in prediction_issues()
               if t + timedelta(hours=MAX_LEAD + args.min_age_hours) <= now]
 
-    def unscored(s, p):
-        names = [n for n, _, _ in targets_from_columns(pd.read_csv(p, nrows=0).columns)]
-        return (any((s, n) not in done for n in names)
-                or any((s, n, b) not in done_base for n in names for b in want_base))
-    pending = [(s, t, p) for s, t, p in mature if unscored(s, p)]
+    def unscored(s, t, p):
+        cols = pd.read_csv(p, nrows=0).columns
+        names = [n for n, _, _ in targets_from_columns(cols)]
+        if any((s, n) not in done for n in names):
+            return True
+        if t < now - timedelta(days=RECENT_DAYS) and not args.backfill:
+            # keeps a routine run's label window (and its Earth Engine top-up) to recent days
+            return False
+        wanted = [b for b in want_base if b != "om_only" or any(c.startswith("om_p_") for c in cols)]
+        return any((s, n, b) not in done_base for n in names for b in wanted)
+    pending = [(s, t, p) for s, t, p in mature if unscored(s, t, p)]
     if args.max_issues:
         pending = pending[: args.max_issues]
     log(f"{len(mature)} mature issues, {len(pending)} with unscored targets/baselines")
@@ -376,8 +413,8 @@ def main():
         print("VERIFY_SUMMARY " + json.dumps({"scored": 0, "pending": 0}))
         return
 
-    # labels for the lead window plus the MAX_LEAD hours before issue (persistence)
-    lo = min(t for _, t, _ in pending) - timedelta(hours=MAX_LEAD)
+    # labels for the lead window plus the hours before issue the persistence baselines read
+    lo = min(t for _, t, _ in pending) - timedelta(hours=MAX_LEAD + AVAILABLE_LAG_H)
     hi = max(t for _, t, _ in pending) + timedelta(hours=MAX_LEAD)
     if not args.no_fetch:
         # local (ICT, UTC+7) label hours span these UTC dates; fetcher takes UTC dates

@@ -883,7 +883,9 @@
         foot += " Persistence = \"it rained in the hour before issue, so it will rain\" using " +
           "observed IMERG up to the issue hour (which the live model never has); climatology = " +
           "the cell's usual wet frequency for this month and hour, flagged at the model's own " +
-          "threshold.";
+          "threshold; persistence, 6 h old = the same rule on hours 6 h before issue, roughly " +
+          "what IMERG has published by then; om_only = the same model without the satellite " +
+          "features, run beside it since 30 Oct.";
     }
     if (VDATA.imerg_lag_days != null && VDATA.imerg_lag_days > 2) {
       foot += ` ⚠ IMERG feed is ${VDATA.imerg_lag_days.toFixed(1)} days behind ` +
@@ -901,21 +903,24 @@
     if (!b || !Object.keys(b).length) { table.hidden = true; body.innerHTML = ""; return; }
     const cols = [["pod", 2, +1], ["far", 2, -1], ["csi", 2, +1], ["roc", 2, +1], ["brier", 3, -1]];
     // persistence_raw: the log's "persistence" forecast with its ROC ranked on the raw score
-    const rows = [["model", t], ["persistence", b.persistence_raw], ["climatology", b.climatology]]
-      .filter(([, r]) => r);
+    const rows = [["model", "model", t], ["persistence", "persistence", b.persistence_raw],
+                  ["persistence", "persistence, 6 h old", b.persistence_lag6h],
+                  ["om_only", "om_only, no IR", b.om_only], ["climatology", "climatology", b.climatology]]
+      .filter(([, , r]) => r);
     const fmt = (v, d) => (v == null ? "—" : v.toFixed(d));
-    body.innerHTML = rows.map(([label, r]) => {
+    body.innerHTML = rows.map(([key, label, r]) => {
       const cells = cols.map(([k, d, sign]) => {
         let cls = "";
-        if (label !== "model" && r[k] != null && t[k] != null) {
+        if (key !== "model" && r[k] != null && t[k] != null) {
           // colour the reference by whether the model beats it on this metric
           const diff = (t[k] - r[k]) * sign;
           cls = diff > 0.005 ? " class=\"best\"" : diff < -0.005 ? " class=\"worse\"" : "";
         }
         return `<td${cls}>${fmt(r[k], d)}</td>`;
       }).join("");
-      const name = label === "model" ? "model" : label;
-      return `<tr class="${label}"><td>${name}</td>${cells}</tr>`;
+      // a reference scored on fewer issues (om_only starts 30 Oct) says so
+      const name = r.issues !== t.issues ? `${label} (${r.issues} issues)` : label;
+      return `<tr class="${key}"><td>${name}</td>${cells}</tr>`;
     }).join("");
     table.hidden = false;
   }
