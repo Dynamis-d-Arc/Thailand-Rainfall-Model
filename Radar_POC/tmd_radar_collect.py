@@ -29,6 +29,7 @@ Layout under ARCHIVE (env TMD_RADAR_ARCHIVE):
 Usage:
     python Radar_POC/tmd_radar_collect.py run [--log-file PATH]
     python Radar_POC/tmd_radar_collect.py report
+    python Radar_POC/tmd_radar_collect.py health     # exit 1 if the newest NetCDF is > 60 min old
     python Radar_POC/tmd_radar_collect.py selftest
 """
 
@@ -58,6 +59,7 @@ BKK = timedelta(hours=7)
 HTTP_TIMEOUT = 60
 RETRY_WAITS = (10, 30)          # between the 3 attempts; the 5-min schedule is the outer retry
 DEADLINE_S = 240                # leave the rest of a PNG backlog to the next run
+STALE_MIN = 60                  # `health` fails when the newest NetCDF is older: 3 frames missed
 UA = "thailand-rainwatch-capstone radar-poc"
 NC_VAR = "var0_1_203_surface"
 NC_SHAPE = (1, 1851, 1301)
@@ -284,6 +286,23 @@ def cmd_run():
     log(detail)
 
 
+def cmd_health():
+    """One status line; exit 1 when the newest NetCDF is over STALE_MIN old (the alert hook)."""
+    now = datetime.now(timezone.utc)
+    stamps = [parse_iso(r["stamp_utc"]) for r in read_csv(MANIFEST) if r["product"] == "nc"]
+    recent = [r for r in read_csv(RUNLOG) if r["event"] != "run"
+              and now - datetime.strptime(r["run_utc"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+              <= timedelta(minutes=STALE_MIN)]
+    problems = f"; problems in the last {STALE_MIN} min: " + ", ".join(
+        sorted({f"{r['event']} {r['product']}" for r in recent})) if recent else ""
+    if not stamps:
+        print("no NetCDF frame archived yet" + problems)
+        sys.exit(1)
+    age = (now - max(stamps)).total_seconds() / 60
+    print(f"newest NetCDF {iso(max(stamps))}, {age:.0f} min old" + problems)
+    sys.exit(0 if age <= STALE_MIN else 1)
+
+
 # ----------------------------------------------------------------------------- report
 
 def slot_status(has_nc, has_png, source_gap):
@@ -429,7 +448,7 @@ def cmd_selftest():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["run", "report", "selftest"])
+    ap.add_argument("cmd", choices=["run", "report", "health", "selftest"])
     ap.add_argument("--log-file", default=None)
     args = ap.parse_args()
     if args.log_file:
@@ -438,7 +457,7 @@ def main():
         if lf.exists() and lf.stat().st_size > 2_000_000:
             lf.replace(lf.with_name(lf.name + ".1"))
         sys.stdout = sys.stderr = open(lf, "a", encoding="utf-8", buffering=1)
-    {"run": cmd_run, "report": cmd_report, "selftest": cmd_selftest}[args.cmd]()
+    {"run": cmd_run, "report": cmd_report, "health": cmd_health, "selftest": cmd_selftest}[args.cmd]()
 
 
 if __name__ == "__main__":

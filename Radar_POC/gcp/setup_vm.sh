@@ -18,6 +18,14 @@ TMD_RADAR_ARCHIVE="$ARCHIVE" python3 "$APP/tmd_radar_collect.py" run
 
 # flock: cron, unlike Task Scheduler, would start a second run while a slow one is still going
 LINE="*/5 * * * * TMD_RADAR_ARCHIVE=$ARCHIVE flock -n /tmp/tmd_radar.lock /usr/bin/python3 $APP/tmd_radar_collect.py run --log-file $ARCHIVE/collector.log"
-( crontab -l 2>/dev/null | grep -v tmd_radar_collect.py || true; echo "$LINE" ) | crontab -
+# Healthchecks.io alert, only once its ping URL has been put in ~/.tmd_radar_healthcheck_url
+HC=""
+if [ -s "$HOME/.tmd_radar_healthcheck_url" ]; then
+  cp "$HERE/healthcheck.sh" "$APP/"
+  HC="7,22,37,52 * * * * TMD_RADAR_ARCHIVE=$ARCHIVE bash $APP/healthcheck.sh"
+fi
+( crontab -l 2>/dev/null | grep -v -e tmd_radar_collect.py -e healthcheck.sh || true
+  echo "$LINE"
+  if [ -n "$HC" ]; then echo "$HC"; fi ) | crontab -
 echo "cron installed:"
 crontab -l
