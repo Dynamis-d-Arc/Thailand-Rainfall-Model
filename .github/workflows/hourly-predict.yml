@@ -100,7 +100,12 @@ jobs:
           fi
           STAMP="$(basename "${NEW[0]}" .csv | sed 's/^v10_predictions_//')"
           git -C "$TMP" commit -m "prediction $STAMP (github-actions)"
-          git -C "$TMP" push origin pub:predictions
+          # one failed push is one lost hour (GitHub returned a 500 here once), so try three times
+          for i in 1 2 3; do
+            git -C "$TMP" push origin pub:predictions && break
+            [ "$i" -lt 3 ] || exit 1
+            sleep $((i * 20))
+          done
 
       # Backstop: even if the push above loses a race, the CSV is downloadable
       # from the run page for 90 days.
