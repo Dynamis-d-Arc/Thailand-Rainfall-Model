@@ -46,17 +46,30 @@ What it can support: radar as a second-stage correction to the live model in Nov
 February. What it cannot: the May to October wet season, or radar inside the main model. Both
 need an archive that covers a wet season.
 
-## Each month
+## How it runs
 
-From the worktree root, with the main checkout's `.venv`:
+The Windows task `TMD Radar Weekly Sync` runs `weekly_sync_and_test.py` every Wednesday at
+12:00, or at the next start-up if the laptop was off. It is registered once, by hand, with
+`powershell -File Radar_POC\register_weekly_task.ps1`. Each run:
+
+1. syncs the cloud archive to `Documents\TMD_Radar_Archive_gcp` (the only second copy);
+2. runs every forward test in the table above that has no summary file yet. A test whose month
+   is not complete (labels or radar stop short of its end) refuses to run and is tried again
+   the next week;
+3. after a test is scored, refreshes the collection report and the persistence scores.
+
+The log is `Documents\TMD_Radar_Archive_gcp\weekly_run.log`. To run it by hand, from the
+worktree root:
 
 ```powershell
-powershell -File Radar_POC\gcp\sync_from_vm.ps1 -VmHost 136.117.100.120
-$env:TMD_RADAR_ARCHIVE = 'C:\Users\Brandon\Documents\TMD_Radar_Archive_gcp'
-$py = 'C:\Users\Brandon\Documents\Phase 1\.venv\Scripts\python.exe'
-& $py Radar_POC\tmd_radar_collect.py report          # gaps, layout changes
-& $py Radar_POC\score_radar_persistence.py
-& $py Radar_POC\radar_stack_test.py forward 2026-12-01
+& 'C:\Users\Brandon\Documents\Phase 1\.venv\Scripts\python.exe' Radar_POC\weekly_sync_and_test.py
 ```
 
-The sync is also the only second copy of the archive, so run it even in a month with no test.
+It needs the laptop on with Postgres running, the Rainwatch server having filled the IMERG
+labels and pulled the month's prediction files, and the worktree left in place.
+
+## Changes since the freeze
+
+- 2026-11-10: forward mode now refuses to score a period whose labels or radar are incomplete.
+  No effect on any number. The 6 to 10 Nov pilot file was written before this, with labels up
+  to 9 Nov 17:00, so re-running that command later would score more hours than the stored file.

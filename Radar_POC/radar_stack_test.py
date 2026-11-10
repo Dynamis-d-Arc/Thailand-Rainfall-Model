@@ -174,6 +174,12 @@ def main(cut=None, end=None):
         pmax, _ = load_labels(conn, lo.to_pydatetime(), hi.to_pydatetime())
     finally:
         conn.close()
+    if cut is not None:
+        # a forward test is scored once, so refuse to score a period that is not complete yet
+        labels_to = pmax.columns.max() if pmax is not None else None
+        radar_to = pd.Timestamp(stamps[-1][:-1]) + BKK
+        if labels_to is None or labels_to < end + timedelta(hours=5) or radar_to < end - timedelta(minutes=15):
+            sys.exit(f"not ready: the test period ends {end}, labels reach {labels_to}, radar reaches {radar_to}")
     d = build_panel(g, stamps, S, pmax).dropna(subset=P_COLS)
     d = d.merge(g[["grid_number", "latitude", "longitude"]], on="grid_number")
     d["hour"] = d.issue_local.dt.hour

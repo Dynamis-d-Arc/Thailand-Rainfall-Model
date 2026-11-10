@@ -42,7 +42,8 @@ if ($missing.Count -eq 0) {
     Invoke-Native scp ($opts + @($list, "${remote}:tmd_radar_missing.txt"))
     Invoke-Native ssh ($opts + @($remote, 'cd tmd_radar_archive && tar -cf ~/tmd_radar_bundle.tar -T ~/tmd_radar_missing.txt'))
     Invoke-Native scp ($opts + @("${remote}:tmd_radar_bundle.tar", $bundle))
-    Invoke-Native tar @('-xf', $bundle, '-C', $Local)
+    # Windows' own tar by full path: Git's GNU tar, first on PATH in a Git Bash shell, reads "C:" as a host
+    Invoke-Native "$env:SystemRoot\System32\tar.exe" @('-xf', $bundle, '-C', $Local)
     Remove-Item $bundle, $list
     Invoke-Native ssh ($opts + @($remote, 'rm -f ~/tmd_radar_bundle.tar ~/tmd_radar_missing.txt'))
     "Fetched $($missing.Count) new files."
