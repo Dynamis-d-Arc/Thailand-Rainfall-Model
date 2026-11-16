@@ -483,6 +483,10 @@ def fetch_live_om(grid, batch_size=50, sleep_s=1.0, retries=6):
                 if attempt == retries:
                     raise
                 throttled = getattr(getattr(exc, "response", None), "status_code", None) == 429
+                # cloud job: a first-batch 429 is the runner's shared address, so waiting here
+                # does not help and a fresh runner does (15 Nov 2026); the workflow re-dispatches
+                if throttled and n == 1 and os.getenv("OM_429_FAIL_FAST"):
+                    raise
                 wait = min(60 * attempt, 300) if throttled else min(10 * attempt, 60)
                 why = "rate-limited" if throttled else type(exc).__name__
                 log(f"  batch {n}: {why}, retrying in {wait}s ({attempt}/{retries})")

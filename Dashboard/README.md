@@ -58,6 +58,12 @@ identical to a local run - verified against the same issue hour, max probability
 difference 0.00000 across all six targets. Since 2026-10-30 the two files differ
 only in `written_local` and `written_by` (see below).
 
+Open-Meteo rate-limits by address and GitHub runners share addresses, so some
+runs are refused (HTTP 429) from their first request. Since 2026-11-16 the cloud
+job gives up at once in that case (`OM_429_FAIL_FAST`) and its last step starts
+the workflow again on a fresh runner, three tries in all and never after :50.
+A local run is unchanged: it keeps the long back-off.
+
 The pull is read-only with respect to the working tree: it updates a
 remote-tracking ref and reads blobs out of it, never checking anything out or
 switching branch. Snapshots older than `RETENTION_DAYS` are skipped rather than

@@ -28,6 +28,10 @@ on:
     # minute BEFORE :25 and a working cron will win the race.
     - cron: '15 * * * *'
   workflow_dispatch:
+    inputs:
+      attempt:
+        description: 'Set by the "Retry on a fresh runner" step; leave at 1'
+        default: '1'
 
 concurrency:
   group: hourly-predict
@@ -35,6 +39,8 @@ concurrency:
 
 permissions:
   contents: write
+  # the last step re-dispatches this workflow
+  actions: write
 
 jobs:
   predict:
@@ -59,6 +65,9 @@ jobs:
           # belt and braces: psycopg2 is not installed, so the grid loader falls
           # back to the CSV on ImportError before any connection is attempted
           PGCONNECT_TIMEOUT: '3'
+          # give up at once on a first-batch 429 so the retry step can try another runner;
+          # the third and last attempt keeps the script's full back-off instead
+          OM_429_FAIL_FAST: ${{ (inputs.attempt || '1') != '3' && '1' || '' }}
         run: |
           set -euo pipefail
           # marker for "which CSVs did this run write" - independent of git state
@@ -116,3 +125,17 @@ jobs:
           path: ML_Model_V2/trained_models/om_thailand_rain_v10_deploy/v10_predictions_*.csv
           if-no-files-found: warn
           retention-days: 90
+
+      # Open-Meteo rate-limits by address and GitHub runners share addresses: on 15 Nov 2026
+      # four runs were refused for their whole 15 min back-off while a fresh runner worked at
+      # once. So a failed run starts one more on a new runner: three tries in all, and never
+      # after :50, because a later start would cross into the next issue hour.
+      - name: Retry on a fresh runner
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATTEMPT: ${{ inputs.attempt || '1' }}
+        run: |
+          if [ "$ATTEMPT" -lt 3 ] && [ "$(date -u +%-M)" -lt 50 ]; then
+            gh workflow run hourly-predict.yml --ref "$GITHUB_REF_NAME" -f attempt=$((ATTEMPT + 1))
+          fi
